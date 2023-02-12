@@ -19,6 +19,7 @@ from sbibm.utils.io import (
     save_float_to_csv,
     save_tensor_to_csv,
 )
+from sbibm.utils.nflows import FlowWrapper
 
 
 @hydra.main(config_path="config", config_name="config")
@@ -29,7 +30,7 @@ def main(cfg: DictConfig) -> None:
     log.info(f"Hostname: {socket.gethostname()}")
     if cfg.seed is None:
         log.info("Seed not specified, generating random seed for replicability")
-        cfg.seed = int(torch.randint(low=1, high=2 ** 32 - 1, size=(1,))[0])
+        cfg.seed = int(torch.randint(low=1, high=2**32 - 1, size=(1,))[0])
         log.info(f"Random seed: {cfg.seed}")
     save_config(cfg)
 
@@ -59,6 +60,7 @@ def main(cfg: DictConfig) -> None:
     parts = cfg.algorithm.run.split(".")
     module_name = ".".join(["sbibm", "algorithms"] + parts[:-1])
     run_fn = getattr(importlib.import_module(module_name), parts[-1])
+    # print(run_fn)
     algorithm_params = cfg.algorithm.params if "params" in cfg.algorithm else {}
     log.info("Start run")
     outputs = run_fn(
@@ -68,6 +70,7 @@ def main(cfg: DictConfig) -> None:
         num_simulations=cfg.task.num_simulations,
         **algorithm_params,
     )
+    # print(outputs)
     runtime = time.time() - t0
     log.info("Finished run")
 
@@ -76,18 +79,21 @@ def main(cfg: DictConfig) -> None:
         samples = outputs
         num_simulations_simulator = float("nan")
         log_prob_true_parameters = float("nan")
-    elif type(outputs) == tuple and len(outputs) == 3:
+        posterior_est = float("nan")
+    elif type(outputs) == tuple and len(outputs) == 4:
         samples = outputs[0]
         num_simulations_simulator = float(outputs[1])
         log_prob_true_parameters = (
             float(outputs[2]) if outputs[2] is not None else float("nan")
         )
+        posterior_est = outputs[-1]
     else:
         raise NotImplementedError
     save_tensor_to_csv(path_samples, samples, columns=task.get_labels_parameters())
     save_float_to_csv(path_runtime, runtime)
     save_float_to_csv(path_num_simulations_simulator, num_simulations_simulator)
     save_float_to_csv(path_log_prob_true_parameters, log_prob_true_parameters)
+    torch.save(posterior_est, f"posterior_est.pkl")
 
     # Predictive samples
     log.info("Draw posterior predictive samples")
@@ -118,6 +124,7 @@ def main(cfg: DictConfig) -> None:
             path_predictive_samples=path_predictive_samples,
             path_log_prob_true_parameters=path_log_prob_true_parameters,
             log=log,
+            posterior_est=posterior_est,
         )
         df_metrics.to_csv("metrics.csv", index=False)
         log.info(f"Metrics:\n{df_metrics.transpose().to_string(header=False)}")
@@ -144,9 +151,10 @@ def compute_metrics_df(
     path_predictive_samples: str,
     path_log_prob_true_parameters: str,
     log: logging.Logger = logging.getLogger(__name__),
+    posterior_est: FlowWrapper = None,
 ) -> pd.DataFrame:
     """Compute all metrics, returns dataframe
-    
+
     Args:
         task_name: Task
         num_observation: Observation
@@ -155,7 +163,7 @@ def compute_metrics_df(
         path_predictive_samples: Path to predictive samples
         path_log_prob_true_parameters: Path to NLTP
         log: Logger
-    
+
     Returns:
         Dataframe with results
     """
@@ -186,6 +194,30 @@ def compute_metrics_df(
     # Load observation
     observation = task.get_observation(num_observation=num_observation)  # noqa
 
+    # get prior and simulator calibration dataset
+    prior = task.get_prior()
+    simulator = task.get_simulator()
+
+    # calibration dataset
+    # same number of samples for L-c2st as for c2st
+    cal_size = len(reference_posterior_samples)
+    theta_cal = prior(num_samples=cal_size)
+    x_cal = simulator(theta_cal)
+    cal_set = {"theta": theta_cal, "x": x_cal}
+
+    # inverse transform and base dist samples for lc2st
+    inv_flow_samples = []
+    for theta, x in zip(theta_cal, x_cal):
+        theta, x = theta[None, :], x[None, :]
+        # embedding not intergrated in transform method (includes standardize)
+        x = posterior_est.flow.net._embedding_net(x)
+        inv_flow_samples.append(posterior_est.flow.net._transform(theta, x)[0].detach())
+    inv_flow_samples = torch.stack(inv_flow_samples)[:, 0, :]
+    base_dist_samples = posterior_est.flow.net._distribution.sample(cal_size)
+    torch.save(cal_set, "calibration_dataset.pkl")
+    torch.save(inv_flow_samples, "inv_flow_samples.pkl")
+    torch.save(base_dist_samples, "base_dist_samples.pkl")
+
     # Get runtime info
     runtime_sec = torch.tensor(get_float_from_csv(path_runtime))  # noqa
 
@@ -206,26 +238,31 @@ def compute_metrics_df(
         "C2ST": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
         "C2ST_Z": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
         "MMD": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
-        "MMD_Z": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
-        "KSD_GAUSS": "metrics.ksd(task=task, num_observation=num_observation, samples=algorithm_posterior_samples, sig2=float(torch.median(torch.pdist(reference_posterior_samples))**2), log=False)",
-        "MEDDIST": "metrics.median_distance(predictive_samples, observation)",
+        # "MMD_Z": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
+        # "KSD_GAUSS": "metrics.ksd(task=task, num_observation=num_observation, samples=algorithm_posterior_samples, sig2=float(torch.median(torch.pdist(reference_posterior_samples))**2), log=False)",
+        # "MEDDIST": "metrics.median_distance(predictive_samples, observation)",
+        "LC2ST-accuracy": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='accuracy')",  # --> check parameters of c2st..
+        "LC2ST-probasMean": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='probas_mean')",  # --> check parameters of c2st..
+        "exp-LC2ST-accuracy": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
+        "exp-LC2ST-probasMean": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
         #
-        # 1K samples
-        #
-        "C2ST_1K": "metrics.c2st(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000,:], z_score=False)",
-        "C2ST_1K_Z": "metrics.c2st(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000, :], z_score=True)",
-        "MMD_1K": "metrics.mmd(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000, :], z_score=False)",
-        "MMD_1K_Z": "metrics.mmd(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000, :], z_score=True)",
-        "KSD_GAUSS_1K": "metrics.ksd(task=task, num_observation=num_observation, samples=algorithm_posterior_samples[:1000, :], sig2=float(torch.median(torch.pdist(reference_posterior_samples))**2), log=False)",
-        "MEDDIST_1K": "metrics.median_distance(predictive_samples[:1000,:], observation)",
-        #
-        # Not based on samples
-        #
-        "NLTP": "-1. * log_prob_true_parameters",
+        # # 1K samples
+        # #
+        # "C2ST_1K": "metrics.c2st(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000,:], z_score=False)",
+        # "C2ST_1K_Z": "metrics.c2st(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000, :], z_score=True)",
+        # "MMD_1K": "metrics.mmd(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000, :], z_score=False)",
+        # "MMD_1K_Z": "metrics.mmd(X=reference_posterior_samples[:1000,:], Y=algorithm_posterior_samples[:1000, :], z_score=True)",
+        # "KSD_GAUSS_1K": "metrics.ksd(task=task, num_observation=num_observation, samples=algorithm_posterior_samples[:1000, :], sig2=float(torch.median(torch.pdist(reference_posterior_samples))**2), log=False)",
+        # "MEDDIST_1K": "metrics.median_distance(predictive_samples[:1000,:], observation)",
+        # #
+        # # Not based on samples
+        # #
+        # "NLTP": "-1. * log_prob_true_parameters",
         "RT": "runtime_sec",
     }
 
     import sbibm.metrics as metrics  # noqa
+    from valdiags.localC2ST import lc2st_sbibm, expected_lc2st_sbibm
 
     metrics_dict = {}
     for metric, eval_cmd in _METRICS_.items():
