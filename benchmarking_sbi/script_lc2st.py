@@ -163,8 +163,9 @@ if __name__ == "__main__":
         samples_flow=inv_flow_samples_ref,
         z_space=True,
         dim=dim,
+        hist=True,
     )
-    plt.savefig(PATH_EXPERIMENT / "z_space_reference.pdf")
+    plt.savefig(PATH_EXPERIMENT / "hist_z_space_reference.pdf")
     plt.show()
 
     # High / Low probability regions
@@ -195,6 +196,7 @@ if __name__ == "__main__":
         samples_flow=algorithm_posterior_samples,
         z_space=False,
         dim=dim,
+        hist=True,
     )
-    plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
+    plt.savefig(PATH_EXPERIMENT / "hist_theta_space_reference.pdf")
     plt.show()
