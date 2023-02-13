@@ -30,7 +30,7 @@ def get_colors(
         column: Column containing algorithms
         hex: If True, will return hex values instead of RGB strings
         include_defaults: If True, will include default colors in returned dict
-    
+
     Returns:
         Dictionary mapping algorithms to colors
     """
@@ -112,14 +112,18 @@ def get_df(
 
 
 def get_float_from_csv(
-    path: Union[str, Path], dtype: type = np.float32,
+    path: Union[str, Path],
+    dtype: type = np.float32,
 ):
     """Get a single float from a csv file"""
     with open(path, "r") as fh:
         return np.loadtxt(fh).astype(dtype)
 
 
-def compile_df(basepath: str,) -> pd.DataFrame:
+def compile_df(
+    basepath: str,
+    old_results=True,
+) -> pd.DataFrame:
     """Compile dataframe for further analyses
 
     `basepath` is the path to a folder over which to recursively loop. All information
@@ -177,12 +181,13 @@ def compile_df(basepath: str,) -> pd.DataFrame:
             if path_log_prob_true_parameters.exists():
                 row["NLTP"] = -1.0 * get_float_from_csv(path_log_prob_true_parameters)
 
-        # Take log of KSD metric
-        # NOTE: Since we originally did not log KSD, this is done post-hoc here
-        row["KSD"] = math.log(row["KSD_GAUSS"])
-        row["KSD_1K"] = math.log(row["KSD_GAUSS_1K"])
-        del row["KSD_GAUSS"]
-        del row["KSD_GAUSS_1K"]
+        if old_results:
+            # Take log of KSD metric
+            # NOTE: Since we originally did not log KSD, this is done post-hoc here
+            row["KSD"] = math.log(row["KSD_GAUSS"])
+            row["KSD_1K"] = math.log(row["KSD_GAUSS_1K"])
+            del row["KSD_GAUSS"]
+            del row["KSD_GAUSS_1K"]
 
         # Runtime
         # While almost all runs were executed on AWS hardware under the same conditions,
@@ -229,7 +234,10 @@ def compile_df(basepath: str,) -> pd.DataFrame:
 
 
 def apply_df(
-    df, row_fn=None, *args, **kwargs,
+    df,
+    row_fn=None,
+    *args,
+    **kwargs,
 ):
     """Apply function for each row of dataframe
 
@@ -249,7 +257,11 @@ def apply_df(
 
 
 def clean(
-    row, delete_unused_metrics=True, mmd_clip=True, mmd_clip_print=False,
+    row,
+    delete_unused_metrics=True,
+    mmd_clip=True,
+    mmd_clip_print=False,
+    old_results=True,
 ):
     """Clean rows
 
@@ -395,24 +407,26 @@ def clean(
     if row["algorithm"] == "SL":
         row["num_simulations"] = den.latex2unicode(f">10^8")
 
-    # For C2ST, use z-scored version (!)
-    row["C2ST_NZ"] = row["C2ST"]
-    row["C2ST_1K_NZ"] = row["C2ST_1K"]
-    row["C2ST"] = row["C2ST_Z"]
-    row["C2ST_1K"] = row["C2ST_1K_Z"]
+    if old_results:
+        # For C2ST, use z-scored version (!)
+        row["C2ST_NZ"] = row["C2ST"]
+        row["C2ST_1K_NZ"] = row["C2ST_1K"]
+        row["C2ST"] = row["C2ST_Z"]
+        row["C2ST_1K"] = row["C2ST_1K_Z"]
 
     # Potentially delete unused metrics
     if delete_unused_metrics:
-        del row["C2ST_NZ"]
-        del row["C2ST_Z"]
-        del row["C2ST_1K"]
-        del row["C2ST_1K_NZ"]
-        del row["C2ST_1K_Z"]
-        del row["MMD_Z"]
-        del row["MMD_1K"]
-        del row["MMD_1K_Z"]
-        del row["KSD_1K"]
-        del row["MEDDIST_1K"]
+        if old_results:
+            del row["C2ST_NZ"]
+            del row["C2ST_Z"]
+            del row["C2ST_1K"]
+            del row["C2ST_1K_NZ"]
+            del row["C2ST_1K_Z"]
+            del row["MMD_Z"]
+            del row["MMD_1K"]
+            del row["MMD_1K_Z"]
+            del row["KSD_1K"]
+            del row["MEDDIST_1K"]
         del row["num_simulations_simulator"]
         del row["seed"]
         del row["path"]

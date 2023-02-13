@@ -5,8 +5,11 @@ from omegaconf import OmegaConf
 
 from utils import apply_df, clean, compile_df, get_df
 
-basepath_runs = Path(__file__).parent.absolute() / "runs"
+from functools import partial
+
+basepath_runs = Path(__file__).parent.absolute() / "multirun"
 basepath = Path(__file__).parent.absolute() / "results"
+old_results = False
 
 
 def main_paper(row):
@@ -256,68 +259,76 @@ def posterior(row):
 
 
 if __name__ == "__main__":
-    df = compile_df(basepath=f"{basepath_runs}")
+    df = compile_df(basepath=f"{basepath_runs}", old_results=old_results)
     df.to_csv(f"{basepath}/df_raw.csv", index=False)
-    df = apply_df(df=df, row_fn=clean)
+    df = apply_df(df=df, row_fn=partial(clean, old_results=old_results))
     df.to_csv(f"{basepath}/df.csv", index=False)
     print(len(df))
 
     print(main_paper.__doc__)
     df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=main_paper)
-    df.to_csv(f"{basepath}/main_paper.csv", index=False)
-    assert len(df) == 2400
 
-    print(abc_lra_sass.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=abc_lra_sass)
-    df.to_csv(f"{basepath}/supplement_abc_lra_sass.csv", index=False)
-    assert len(df) == 1800
+    if not old_results:
+        df.to_csv(f"{basepath}/lc2st_comaprison.csv", index=False)
+    else:
+        df.to_csv(f"{basepath}/main_paper.csv", index=False)
+        assert len(df) == 2400
 
-    print(rf_abc.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=rf_abc)
-    df.to_csv(f"{basepath}/supplement_rf_abc.csv", index=False)
-    assert len(df) == 900
+        print(abc_lra_sass.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=abc_lra_sass)
+        df.to_csv(f"{basepath}/supplement_abc_lra_sass.csv", index=False)
+        assert len(df) == 1800
 
-    print(sl.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=sl)
-    df.to_csv(f"{basepath}/supplement_sl.csv", index=False)
-    assert len(df) == 560
+        print(rf_abc.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=rf_abc)
+        df.to_csv(f"{basepath}/supplement_rf_abc.csv", index=False)
+        assert len(df) == 900
 
-    print(rej_abc_sweep.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=rej_abc_sweep)
-    df.to_csv(f"{basepath}/supplement_hyperparameters_rej_abc.csv", index=False)
-    assert len(df) == 1500
+        print(sl.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=sl)
+        df.to_csv(f"{basepath}/supplement_sl.csv", index=False)
+        assert len(df) == 560
 
-    print(smc_abc_sweep_ours.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=smc_abc_sweep_ours)
-    df.to_csv(f"{basepath}/supplement_hyperparameters_smc_abc_ours.csv", index=False)
-    assert len(df) == 7200
+        print(rej_abc_sweep.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=rej_abc_sweep)
+        df.to_csv(f"{basepath}/supplement_hyperparameters_rej_abc.csv", index=False)
+        assert len(df) == 1500
 
-    print(smc_abc_sweep_pyabc.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=smc_abc_sweep_pyabc)
-    df.to_csv(f"{basepath}/supplement_hyperparameters_smc_abc_pyabc.csv", index=False)
-    assert len(df) == 7200
+        print(smc_abc_sweep_ours.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=smc_abc_sweep_ours)
+        df.to_csv(
+            f"{basepath}/supplement_hyperparameters_smc_abc_ours.csv", index=False
+        )
+        assert len(df) == 7200
 
-    print(snle_maf_nsf.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=snle_maf_nsf)
-    df.to_csv(f"{basepath}/supplement_hyperparameters_snle.csv", index=False)
-    assert len(df) == 1200
+        print(smc_abc_sweep_pyabc.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=smc_abc_sweep_pyabc)
+        df.to_csv(
+            f"{basepath}/supplement_hyperparameters_smc_abc_pyabc.csv", index=False
+        )
+        assert len(df) == 7200
 
-    print(snpe_maf_nsf.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=snpe_maf_nsf)
-    df.to_csv(f"{basepath}/supplement_hyperparameters_snpe.csv", index=False)
-    assert len(df) == 1200
+        print(snle_maf_nsf.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=snle_maf_nsf)
+        df.to_csv(f"{basepath}/supplement_hyperparameters_snle.csv", index=False)
+        assert len(df) == 1200
 
-    print(snre_mlp_res.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=snre_mlp_res)
-    df.to_csv(f"{basepath}/supplement_hyperparameters_snre.csv", index=False)
-    assert len(df) == 1200
+        print(snpe_maf_nsf.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=snpe_maf_nsf)
+        df.to_csv(f"{basepath}/supplement_hyperparameters_snpe.csv", index=False)
+        assert len(df) == 1200
 
-    print(prior.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=prior)
-    df.to_csv(f"{basepath}/extra_prior.csv", index=False)
-    assert len(df) == 100
+        print(snre_mlp_res.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=snre_mlp_res)
+        df.to_csv(f"{basepath}/supplement_hyperparameters_snre.csv", index=False)
+        assert len(df) == 1200
 
-    print(posterior.__doc__)
-    df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=posterior)
-    df.to_csv(f"{basepath}/extra_posterior.csv", index=False)
-    assert len(df) == 80  # 2 tasks share the same posterior
+        print(prior.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=prior)
+        df.to_csv(f"{basepath}/extra_prior.csv", index=False)
+        assert len(df) == 100
+
+        print(posterior.__doc__)
+        df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=posterior)
+        df.to_csv(f"{basepath}/extra_posterior.csv", index=False)
+        assert len(df) == 80  # 2 tasks share the same posterior

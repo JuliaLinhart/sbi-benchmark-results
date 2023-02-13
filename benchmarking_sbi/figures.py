@@ -17,26 +17,49 @@ basepath_dfs = Path(__file__).parent.absolute() / "results"
 basepath_figs = Path(__file__).parent.absolute() / "figures"
 
 all_tasks = [
-    ["gaussian_linear", "gaussian_linear_uniform"],
-    ["slcp", "slcp_distractors"],
-    ["bernoulli_glm", "bernoulli_glm_raw"],
-    ["gaussian_linear"],
-    ["gaussian_linear_uniform"],
-    ["slcp"],
-    ["slcp_distractors"],
-    ["bernoulli_glm"],
-    ["bernoulli_glm_raw"],
-    ["gaussian_mixture"],
-    ["two_moons"],
-    ["sir"],
-    ["lotka_volterra"],
+    ["gaussian_linear"]  # , "gaussian_linear_uniform"],
+    # ["slcp", "slcp_distractors"],
+    # ["bernoulli_glm", "bernoulli_glm_raw"],
+    # ["gaussian_linear"],
+    # ["gaussian_linear_uniform"],
+    # ["slcp"],
+    # ["slcp_distractors"],
+    # ["bernoulli_glm"],
+    # ["bernoulli_glm_raw"],
+    # ["gaussian_mixture"],
+    # ["two_moons"],
+    # ["sir"],
+    # ["lotka_volterra"],
 ]
 
-all_metrics = ["C2ST", "MMD", "KSD", "MEDDIST", "RT"]
+# all_metrics = ["C2ST", "MMD", "KSD", "MEDDIST", "RT"]
+all_metrics = [
+    "MMD",
+    "C2ST",
+    "LC2ST-probasMean",
+    "LC2ST-accuracy",
+    "exp-LC2ST-probasMean",
+    "exp-LC2ST-accuracy",
+    "RT",
+]
+
+
+def figs_lc2st_comparison():
+    df = get_df(
+        path=f"{basepath_dfs}/lc2st_comparison.csv",
+    )
+    for tasks in tqdm(all_tasks):
+        for metric in all_metrics:
+            plot_task_metric(df, tasks, metric, subfolder="lc2st_comparison")
+            plot_task_metric(
+                df, tasks, metric, subfolder="lc2st_comparison", labels=False
+            )
 
 
 def figs_main_paper():
-    df = get_df(path=f"{basepath_dfs}/main_paper.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/main_paper.csv",
+    )
     df.loc[df["algorithm"] == "REJ-ABC", "algorithm"] = " REJ-ABC"
     for tasks in tqdm(all_tasks):
         for metric in all_metrics:
@@ -45,7 +68,9 @@ def figs_main_paper():
 
 
 def figs_abc_lra_sass():
-    df = get_df(path=f"{basepath_dfs}/supplement_abc_lra_sass.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_abc_lra_sass.csv",
+    )
 
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST"]:
@@ -67,7 +92,9 @@ def figs_abc_lra_sass():
 
 
 def figs_rf_abc():
-    df = get_df(path=f"{basepath_dfs}/supplement_rf_abc.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_rf_abc.csv",
+    )
     subfolder = "rf_abc"
     df.loc[df["algorithm"] == "RF-ABC", "algorithm"] = " RF-ABC"
     for tasks in tqdm(all_tasks):
@@ -76,7 +103,9 @@ def figs_rf_abc():
 
 
 def figs_sl():
-    df = get_df(path=f"{basepath_dfs}/supplement_sl.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_sl.csv",
+    )
     subfolder = "sl"
     df.loc[df["algorithm"] == "SL", "algorithm"] = " SL"
     df.loc[df["algorithm"] == "NLE-MAF", "algorithm"] = "NLE"
@@ -87,7 +116,9 @@ def figs_sl():
 
 
 def figs_hyperparameters_rej_abc():
-    df = get_df(path=f"{basepath_dfs}/supplement_hyperparameters_rej_abc.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_hyperparameters_rej_abc.csv",
+    )
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST"]:
             plot_task_metric(
@@ -108,7 +139,9 @@ def figs_hyperparameters_rej_abc():
 
 
 def figs_hyperparameters_smc_abc_ours():
-    df = get_df(path=f"{basepath_dfs}/supplement_hyperparameters_smc_abc_ours.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_hyperparameters_smc_abc_ours.csv",
+    )
 
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST"]:
@@ -132,7 +165,9 @@ def figs_hyperparameters_smc_abc_ours():
 
 
 def figs_hyperparameters_smc_abc_pyabc():
-    df = get_df(path=f"{basepath_dfs}/supplement_hyperparameters_smc_abc_pyabc.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_hyperparameters_smc_abc_pyabc.csv",
+    )
 
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST"]:
@@ -156,7 +191,9 @@ def figs_hyperparameters_smc_abc_pyabc():
 
 
 def figs_hyperparameters_snle():
-    df = get_df(path=f"{basepath_dfs}/supplement_hyperparameters_snle.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_hyperparameters_snle.csv",
+    )
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST", "RT"]:
             plot_task_metric(df, tasks, metric, subfolder="hyperparameters_snle")
@@ -166,7 +203,9 @@ def figs_hyperparameters_snle():
 
 
 def figs_hyperparameters_snpe():
-    df = get_df(path=f"{basepath_dfs}/supplement_hyperparameters_snpe.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_hyperparameters_snpe.csv",
+    )
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST", "RT"]:
             plot_task_metric(df, tasks, metric, subfolder="hyperparameters_snpe")
@@ -176,7 +215,9 @@ def figs_hyperparameters_snpe():
 
 
 def figs_hyperparameters_snre():
-    df = get_df(path=f"{basepath_dfs}/supplement_hyperparameters_snre.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/supplement_hyperparameters_snre.csv",
+    )
     for tasks in tqdm(all_tasks):
         for metric in ["C2ST", "RT"]:
             plot_task_metric(df, tasks, metric, subfolder="hyperparameters_snre")
@@ -186,7 +227,9 @@ def figs_hyperparameters_snre():
 
 
 def figs_posterior():
-    df = get_df(path=f"{basepath_dfs}/extra_posterior.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/extra_posterior.csv",
+    )
     subfolder = "extra_posterior"
     for tasks in tqdm(all_tasks):
         plot_task_metric(df, tasks, "C2ST", subfolder=subfolder)
@@ -194,7 +237,9 @@ def figs_posterior():
 
 
 def figs_correlations():
-    df = get_df(path=f"{basepath_dfs}/main_paper.csv",)
+    df = get_df(
+        path=f"{basepath_dfs}/main_paper.csv",
+    )
     subfolder = "correlations"
     for task in tqdm(df.task.unique()):
         plot_task_correlation(df, task, subfolder=subfolder)
@@ -339,7 +384,8 @@ def plot_task_metric(
     )  # Move y-axis label
     if not labels:
         data = data.replace(
-            'transform="translate(20,9)', 'transform="translate(20,15)',
+            'transform="translate(20,9)',
+            'transform="translate(20,15)',
         )  # Move title
     fin.close()
 
@@ -369,16 +415,17 @@ def update_figs(logfile, latex_dir):
 
 
 if __name__ == "__main__":
-    figs_main_paper()
-    figs_abc_lra_sass()
-    figs_rf_abc()
-    figs_sl()
-    figs_hyperparameters_rej_abc()
-    figs_hyperparameters_smc_abc_ours()
-    figs_hyperparameters_smc_abc_pyabc()
-    figs_hyperparameters_snle()
-    figs_hyperparameters_snpe()
-    figs_hyperparameters_snre()
-    figs_correlations()
-    figs_mmd()
-    figs_posterior()
+    figs_lc2st_comparison()
+    # figs_main_paper()
+    # figs_abc_lra_sass()
+    # figs_rf_abc()
+    # figs_sl()
+    # figs_hyperparameters_rej_abc()
+    # figs_hyperparameters_smc_abc_ours()
+    # figs_hyperparameters_smc_abc_pyabc()
+    # figs_hyperparameters_snle()
+    # figs_hyperparameters_snpe()
+    # figs_hyperparameters_snre()
+    # figs_correlations()
+    # figs_mmd()
+    # figs_posterior()
