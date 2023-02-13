@@ -269,7 +269,7 @@ if __name__ == "__main__":
     df = apply_df(df=get_df(path=f"{basepath}/df.csv"), row_fn=main_paper)
 
     if not old_results:
-        df.to_csv(f"{basepath}/lc2st_comaprison.csv", index=False)
+        df.to_csv(f"{basepath}/lc2st_comparison.csv", index=False)
     else:
         df.to_csv(f"{basepath}/main_paper.csv", index=False)
         assert len(df) == 2400

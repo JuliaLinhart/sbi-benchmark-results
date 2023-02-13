@@ -17,7 +17,7 @@ basepath_dfs = Path(__file__).parent.absolute() / "results"
 basepath_figs = Path(__file__).parent.absolute() / "figures"
 
 all_tasks = [
-    ["gaussian_linear"]  # , "gaussian_linear_uniform"],
+    # ["gaussian_linear", "gaussian_linear_uniform"],
     # ["slcp", "slcp_distractors"],
     # ["bernoulli_glm", "bernoulli_glm_raw"],
     # ["gaussian_linear"],
@@ -26,7 +26,7 @@ all_tasks = [
     # ["slcp_distractors"],
     # ["bernoulli_glm"],
     # ["bernoulli_glm_raw"],
-    # ["gaussian_mixture"],
+    ["gaussian_mixture"],
     # ["two_moons"],
     # ["sir"],
     # ["lotka_volterra"],
