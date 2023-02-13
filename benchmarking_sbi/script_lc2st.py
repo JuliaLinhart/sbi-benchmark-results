@@ -158,15 +158,19 @@ if __name__ == "__main__":
 
     dim = thetas.shape[-1]
 
-    flow_vs_reference_distribution(
-        samples_ref=base_dist_samples_cal,
-        samples_flow=inv_flow_samples_ref,
-        z_space=True,
-        dim=dim,
-        hist=True,
-    )
-    plt.savefig(PATH_EXPERIMENT / "hist_z_space_reference.pdf")
-    plt.show()
+    for hist in [True, False]:
+        flow_vs_reference_distribution(
+            samples_ref=base_dist_samples_cal,
+            samples_flow=inv_flow_samples_ref,
+            z_space=True,
+            dim=dim,
+            hist=hist,
+        )
+        if hist:
+            plt.savefig(PATH_EXPERIMENT / "hist_z_space_reference.pdf")
+        else:
+            plt.savefig(PATH_EXPERIMENT / "z_space_reference.pdf")
+        plt.show()
 
     # High / Low probability regions
     from valdiags.localC2ST import z_space_with_proba_intensity
@@ -191,12 +195,16 @@ if __name__ == "__main__":
     algorithm_posterior_samples = get_tensor_from_csv(
         PATH_EXPERIMENT / "posterior_samples.csv.bz2"
     )[: task.num_posterior_samples, :]
-    flow_vs_reference_distribution(
-        samples_ref=posterior_samples,
-        samples_flow=algorithm_posterior_samples,
-        z_space=False,
-        dim=dim,
-        hist=True,
-    )
-    plt.savefig(PATH_EXPERIMENT / "hist_theta_space_reference.pdf")
-    plt.show()
+    for hist in [True, False]:
+        flow_vs_reference_distribution(
+            samples_ref=posterior_samples,
+            samples_flow=algorithm_posterior_samples,
+            z_space=False,
+            dim=dim,
+            hist=hist,
+        )
+        if hist:
+            plt.savefig(PATH_EXPERIMENT / "hist_theta_space_reference.pdf")
+        else:
+            plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
+        plt.show()
