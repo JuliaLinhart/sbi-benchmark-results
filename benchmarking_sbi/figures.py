@@ -4,7 +4,7 @@ from pathlib import Path
 from shutil import copy
 
 import altair as alt
-import altair_saver
+from altair_saver import save
 import deneb as den
 import pandas as pd
 import sbibm
@@ -12,6 +12,8 @@ from sbibm.visualisation import fig_correlation, fig_metric, fig_posterior
 from tqdm.auto import tqdm
 
 from utils import get_colors, get_df
+
+# alt.renderer.enable("altair_saver", ["vega-lite", "png", "svg"])
 
 basepath_dfs = Path(__file__).parent.absolute() / "results"
 basepath_figs = Path(__file__).parent.absolute() / "figures"
@@ -36,6 +38,7 @@ all_tasks = [
 all_metrics = [
     "MMD",
     "C2ST",
+    "C2ST_Z",
     "LC2ST-probasMean",
     "LC2ST-accuracy",
     "exp-LC2ST-probasMean",
