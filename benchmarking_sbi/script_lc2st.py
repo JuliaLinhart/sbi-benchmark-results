@@ -57,6 +57,13 @@ if __name__ == "__main__":
         help="Whether to run the lc2st or just generate plots.",
     )
 
+    parser.add_argument(
+        "--correct_posterior",
+        "-c",
+        action="store_true",
+        help="Whether to run posterior corretion or not.",
+    )
+
     args = parser.parse_args()
 
     random.seed(1)
@@ -207,4 +214,73 @@ if __name__ == "__main__":
             plt.savefig(PATH_EXPERIMENT / "hist_theta_space_reference.pdf")
         else:
             plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
+        plt.show()
+
+    # Corrected posterior
+    if args.correct_posterior:
+        d = probas_ens
+        r = (1 - d) / d
+
+        resample_idx = torch.multinomial(
+            torch.tensor(r), len(z_space_eval), replacement=True
+        )
+        plt.scatter(
+            z_space_eval.numpy()[:, 0],
+            z_space_eval.numpy()[:, 1],
+            alpha=0.3,
+            label="normal: Z",
+            color="grey",
+        )
+        plt.scatter(
+            z_space_eval[resample_idx].numpy()[:, 0],
+            z_space_eval[resample_idx].numpy()[:, 1],
+            alpha=0.3,
+            color="orange",
+            label="corrected normal",
+        )
+        plt.scatter(
+            inv_flow_samples_ref[: len(z_space_eval), 0].numpy(),
+            inv_flow_samples_ref[: len(z_space_eval), 1].numpy(),
+            color="red",
+            alpha=0.2,
+            label=r"Reference: $T_{\phi}^{-1}(\Theta, x_0)\mid x_0$",
+        )
+
+        plt.legend()
+        plt.show()
+
+        zs, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
+            z_space_eval, observation_emb
+        )
+        flow_thetas = posterior_est.flow.net._transform.inverse(zs, xs)[0]
+
+        corrected_zs, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
+            z_space_eval[resample_idx], observation_emb
+        )
+        corrrected_thetas = posterior_est.flow.net._transform.inverse(corrected_zs, xs)[
+            0
+        ]
+
+        plt.scatter(
+            flow_thetas.detach().numpy()[:, 0],
+            flow_thetas.detach().numpy()[:, 1],
+            alpha=0.3,
+            color="red",
+            label=r"bad NF: $T_{\phi}(Z;x_0)$",
+        )
+        plt.scatter(
+            corrrected_thetas.detach().numpy()[:, 0],
+            corrrected_thetas.detach().numpy()[:, 1],
+            alpha=0.3,
+            color="orange",
+            label="corrected bad NF",
+        )
+        plt.scatter(
+            posterior_samples.numpy()[: len(z_space_eval), 0],
+            posterior_samples.numpy()[: len(z_space_eval), 1],
+            color="blue",
+            alpha=0.3,
+            label=r"Reference: $\Theta \mid x_0$",
+        )
+        plt.legend()
         plt.show()
