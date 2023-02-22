@@ -48,6 +48,8 @@ if __name__ == "__main__":
     theta = prior(num_samples=args.n_samples)
     x = simulator(theta)
 
+    PATH = Path.cwd() / "eval_clfs_lc2st" / f"{args.task}"
+
     # Models
     ndim = theta.shape[-1] + x.shape[-1]
     clf_classes = {
@@ -100,10 +102,8 @@ if __name__ == "__main__":
     ).rsample((args.n_samples,))
 
     if args.shift == "mean":
-        if os.path.exists(Path.cwd() / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl"):
-            df_mean = torch.load(
-                Path.cwd() / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl"
-            )
+        if os.path.exists(PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl"):
+            df_mean = torch.load(PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl")
         else:
             clf_names = ["lda", "mlp_sbi", "mlp_base", "rf", "logreg"]
 
@@ -133,7 +133,8 @@ if __name__ == "__main__":
             df_mean = pd.concat(dfs, ignore_index=True)
 
             torch.save(
-                df_mean, Path.cwd() / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl",
+                df_mean,
+                PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl",
             )
 
         sns.relplot(
@@ -144,14 +145,12 @@ if __name__ == "__main__":
             style="classifier",
             kind="line",
         )
-        plt.savefig(Path.cwd() / "lc2st_mean_shift.pdf")
+        plt.savefig(PATH / f"lc2st_mean_shift_n_{args.n_samples}.pdf")
         plt.show()
 
     elif args.shift == "scale":
-        if os.path.exists(Path.cwd() / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"):
-            df_scale = torch.load(
-                Path.cwd() / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"
-            )
+        if os.path.exists(PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"):
+            df_scale = torch.load(PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl")
         else:
             clf_names = ["qda", "mlp_sbi", "mlp_base", "rf", "logreg"]
 
@@ -181,7 +180,8 @@ if __name__ == "__main__":
             df_scale = pd.concat(dfs, ignore_index=True)
 
             torch.save(
-                df_scale, Path.cwd() / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"
+                df_scale,
+                PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl",
             )
 
         sns.relplot(
@@ -192,7 +192,7 @@ if __name__ == "__main__":
             style="classifier",
             kind="line",
         )
-        plt.savefig(Path.cwd() / "lc2st_scale_shift.pdf")
+        plt.savefig(PATH / f"lc2st_scale_shift_n_{args.n_samples}.pdf")
         plt.show()
 
     else:

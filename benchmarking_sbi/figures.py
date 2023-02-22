@@ -39,10 +39,14 @@ all_metrics = [
     "MMD",
     "C2ST",
     "C2ST_Z",
-    "LC2ST-probasMean",
-    "LC2ST-accuracy",
-    "exp-LC2ST-probasMean",
-    "exp-LC2ST-accuracy",
+    "LC2ST-probasMean-z",
+    "LC2ST-accuracy-z",
+    "exp-LC2ST-probasMean-z",
+    "exp-LC2ST-accuracy-z",
+    "LC2ST-probasMean-theta",
+    "LC2ST-accuracy-theta",
+    "exp-LC2ST-probasMean-theta",
+    "exp-LC2ST-accuracy-theta",
     "RT",
 ]
 

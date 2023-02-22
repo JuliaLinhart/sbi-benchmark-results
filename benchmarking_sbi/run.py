@@ -229,7 +229,7 @@ def compute_metrics_df(
         sample_z = est.flow.net._distribution.sample(1)
         x_emb = est.flow.net._embedding_net(x[None, :])
         flow_posterior_samples_cal.append(
-            est.flow.net._transform.inverse(sample_z, x_emb)[0]
+            est.flow.net._transform.inverse(sample_z, x_emb)[0].detach()
         )
     flow_posterior_samples_cal = torch.stack(flow_posterior_samples_cal)[:, 0, :]
     torch.save(flow_posterior_samples_cal, "flow_posterior_samples_cal.pkl")
