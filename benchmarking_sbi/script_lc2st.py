@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import random
 
 from sbibm.utils.io import get_tensor_from_csv, save_float_to_csv
+from valdiags.plot_utils import multi_corner_plots
 
 import os
 
@@ -68,6 +69,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--n_rej_trials",
+        "-nr",
+        type=int,
+        default=1,
+        help="How many times to run rejection sampling.",
+    )
+
+    parser.add_argument(
         "--z_space",
         "-z",
         action="store_true",
@@ -100,7 +109,22 @@ if __name__ == "__main__":
         PATH_EXPERIMENT / "posterior_samples.csv.bz2"
     )[: task.num_posterior_samples, :]
 
-    # =============== Reference plots ==================
+    path_trained_clfs = Path.cwd() / "trained_clfs_lc2st" / f"{args.task}"
+    if os.path.exists(path_trained_clfs / f"lc2st_probas_null_z_{args.z_space}.pkl"):
+        probas_null = torch.load(
+            path_trained_clfs / f"lc2st_probas_null_z_{args.z_space}.pkl"
+        )
+    else:
+        probas_null = []
+
+    if os.path.exists(path_trained_clfs / f"trained_clfs_z_{args.z_space}.pkl"):
+        trained_clfs = torch.load(
+            path_trained_clfs / f"trained_clfs_z_{args.z_space}.pkl"
+        )
+    else:
+        trained_clfs = []
+
+    # # =============== Reference plots ==================
 
     # True conditional distributions: norm, inv-flow
     from valdiags.localC2ST import flow_vs_reference_distribution
@@ -114,63 +138,61 @@ if __name__ == "__main__":
     inv_flow_samples_ref = posterior_est.flow.net._transform(thetas, xs)[0].detach()
 
     dim = thetas.shape[-1]
-    if dim <= 2:
-        flow_vs_reference_distribution(
-            samples_ref=base_dist_samples_cal,
-            samples_flow=inv_flow_samples_ref,
-            z_space=True,
-            dim=dim,
-            hist=False,
-        )
-        plt.savefig(PATH_EXPERIMENT / "z_space_reference.pdf")
-        plt.show()
+    # if dim <= 2:
+    #     flow_vs_reference_distribution(
+    #         samples_ref=base_dist_samples_cal,
+    #         samples_flow=inv_flow_samples_ref,
+    #         z_space=True,
+    #         dim=dim,
+    #         hist=False,
+    #     )
+    #     plt.savefig(PATH_EXPERIMENT / "z_space_reference.pdf")
+    #     plt.show()
 
-    from valdiags.plot_utils import multi_corner_plots
+    # samples_list = [base_dist_samples_cal, inv_flow_samples_ref]
+    # legends = [
+    #     r"Ref: $\mathcal{N}(0,1)$",
+    #     r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
+    # ]
+    # colors = ["blue", "orange"]
+    # multi_corner_plots(
+    #     samples_list,
+    #     legends,
+    #     colors,
+    #     title=r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)",
+    #     labels=[r"$z$" f"_{i+1}" for i in range(dim)],
+    #     domain=(torch.ones(dim) * -5, torch.ones(dim) * 5),
+    # )
+    # plt.savefig(PATH_EXPERIMENT / "z_space_reference_corner.pdf")
+    # plt.show()
 
-    samples_list = [base_dist_samples_cal, inv_flow_samples_ref]
-    legends = [
-        r"Ref: $\mathcal{N}(0,1)$",
-        r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
-    ]
-    colors = ["blue", "orange"]
-    multi_corner_plots(
-        samples_list,
-        legends,
-        colors,
-        title=r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)",
-        labels=[r"$z$" f"_{i}" for i in range(dim)],
-        # domain=(torch.tensor([-5, -5]), torch.tensor([5, 5])),
-    )
-    plt.savefig(PATH_EXPERIMENT / "z_space_reference_corner.pdf")
-    plt.show()
+    # # True vs. estimated posterior samples
+    # if dim <= 2:
+    #     flow_vs_reference_distribution(
+    #         samples_ref=posterior_samples,
+    #         samples_flow=algorithm_posterior_samples,
+    #         z_space=False,
+    #         dim=dim,
+    #         hist=False,
+    #     )
+    #     plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
+    #     plt.show()
 
-    # True vs. estimated posterior samples
-    if dim <= 2:
-        flow_vs_reference_distribution(
-            samples_ref=posterior_samples,
-            samples_flow=algorithm_posterior_samples,
-            z_space=False,
-            dim=dim,
-            hist=False,
-        )
-        plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
-        plt.show()
+    # samples_list = [posterior_samples, algorithm_posterior_samples]
+    # legends = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
+    # colors = ["blue", "orange"]
+    # multi_corner_plots(
+    #     samples_list,
+    #     legends,
+    #     colors,
+    #     title=r"True vs. Estimated distributions at $x_0$",
+    #     labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)],
+    #     # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
+    # )
+    # plt.savefig(PATH_EXPERIMENT / "theta_space_reference_corner.pdf")
+    # plt.show()
 
-    samples_list = [posterior_samples, algorithm_posterior_samples]
-    legends = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
-    colors = ["blue", "orange"]
-    multi_corner_plots(
-        samples_list,
-        legends,
-        colors,
-        title=r"True vs. Estimated distributions at $x_0$",
-        labels=[r"$\theta$" + f"_{i}" for i in range(dim)],
-        # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
-    )
-    plt.savefig(PATH_EXPERIMENT / "theta_space_reference_corner.pdf")
-    plt.show()
-
-    plt.close("all")
+    # plt.close("all")
 
     # =============== Hypothesis test and ensemble probas ================
     metrics = ["probas_mean", "w_dist", "TV"]
@@ -187,7 +209,7 @@ if __name__ == "__main__":
             P_eval = posterior_est.flow.net._distribution.sample(test_size).detach()
             null_dist = posterior_est.flow.net._distribution
             null_samples_list = None
-            clf_kwargs = {"alpha": 0, "max_iter": 25000}
+            # clf_kwargs = {"alpha": 0, "max_iter": 25000}
         else:
             P = flow_posterior_samples_cal
             Q = cal_set["theta"]
@@ -206,23 +228,6 @@ if __name__ == "__main__":
                     posterior_est.flow.net._transform.inverse(zs, xs)[0].detach()
                 )
             clf_kwargs = None
-
-        path_trained_clfs = Path.cwd() / "trained_clfs_lc2st" / f"{args.task}"
-        if os.path.exists(
-            path_trained_clfs / f"lc2st_probas_null_z_{args.z_space}.pkl"
-        ):
-            probas_null = torch.load(
-                path_trained_clfs / f"lc2st_probas_null_z_{args.z_space}.pkl"
-            )
-        else:
-            probas_null = []
-
-        if os.path.exists(path_trained_clfs / f"trained_clfs_z_{args.z_space}.pkl"):
-            trained_clfs = torch.load(
-                path_trained_clfs / f"trained_clfs_z_{args.z_space}.pkl"
-            )
-        else:
-            trained_clfs = []
 
         (
             p_values,
@@ -349,113 +354,232 @@ if __name__ == "__main__":
     # =============== Posterior correction ==================
 
     if args.correct_posterior:
-        d = probas_ens
-        r = (1 - d) / d
-
-        resample_idx = torch.multinomial(
-            torch.tensor(r),
-            len(P_eval),
-            replacement=True,
+        from valdiags.posterior_correction import (
+            rejection_sampling,
+            clf_ratio_obs,
+            corrected_pdf,
+            flow_sampler,
+            uniform_sampler,
         )
+        from utils import fwd_flow_transform_obs, inv_flow_transform_obs
+        from functools import partial
+
+        flow_transform = partial(
+            fwd_flow_transform_obs, observation=observation, flow=posterior_est.flow
+        )
+
+        inv_flow_transform = partial(
+            inv_flow_transform_obs, observation=observation, flow=posterior_est.flow
+        )
+
+        base_dist_sampler = posterior_est.flow.net._distribution.sample
 
         if args.z_space:
 
-            samples_list = [
-                P_eval.numpy(),
-                P_eval[resample_idx].numpy(),
-                inv_flow_samples_ref.numpy(),
-            ]
-            legends = [
-                "normal: Z",
-                "corrected normal",
-                r"Reference: $T_{\phi}^{-1}(\Theta, x_0)\mid x_0$",
-            ]
-            colors = ["grey", "red", "orange"]
+            ## ====== BASE DISTRIBUTION SPACE =======
+
+            # proposal = base_dist = normal
+            proposal_sampler = base_dist_sampler
+            # f = ratio
+            f = partial(clf_ratio_obs, x_obs=observation, clfs=trained_clfs)
+            # sample from normal_pdf * ratio = p(z|x_obs)
+            acc_rej_samples_normal = []
+            for _ in range(args.n_rej_trials):
+                acc_rej_samples_normal.append(
+                    rejection_sampling(proposal_sampler=proposal_sampler, f=f)
+                )
+
+            samples_list = [P_eval.numpy()] + acc_rej_samples_normal
+            legends = ["normal: Z"] + [
+                "corrected normal acc_rej_normal"
+            ] * args.n_rej_trials
+            colors = ["grey"] + ["red"] * args.n_rej_trials
+
+            if dim < 3:
+                # proposal = uniform
+                # --> very long in high dimensions
+                proposal_sampler = partial(uniform_sampler, dim=dim)
+                # f = ratio * normal_pdf = p(z|x_obs)
+                f = partial(
+                    corrected_pdf,
+                    dist=posterior_est.flow.net._distribution,
+                    x_obs=observation,
+                    clfs=trained_clfs,
+                )
+                # sample from ratio * normal_pdf \approx p(z|x_obs)
+                acc_rej_samples_uniform = []
+                for _ in range(args.n_rej_trials):
+                    acc_rej_samples_uniform.append(
+                        rejection_sampling(proposal_sampler=proposal_sampler, f=f)
+                    )
+
+                samples_list += acc_rej_samples_uniform
+                legends += ["corrected normal acc_rej_uniform"] * args.n_rej_trials
+                colors += ["green"] * args.n_rej_trials
+
+            samples_list += [inv_flow_samples_ref.numpy()]
+            legends += [r"Reference: $T_{\phi}^{-1}(\Theta, x_0)\mid x_0$"]
+            colors += ["orange"]
             multi_corner_plots(
                 samples_list,
                 legends,
                 colors,
                 title="correction in z-space",
-                labels=[r"$z$" + f"_{i}" for i in range(dim)]
-                # domain=(torch.tensor([-5, -5]), torch.tensor([5, 5])),
+                labels=[r"$z$" + f"_{i+1}" for i in range(dim)],
+                domain=(torch.ones(dim) * -5, torch.ones(dim) * 5),
             )
             plt.savefig(PATH_EXPERIMENT / "z_space_correction_corner.pdf")
             plt.show()
 
-            zs, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
-                P_eval, observation_emb
+            ## ======== PARAMETER SPACE =========
+            flow_thetas = flow_sampler(
+                args.test_size, base_dist_sampler, flow_transform
             )
-            flow_thetas = posterior_est.flow.net._transform.inverse(zs, xs)[0]
 
-            corrected_zs, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
-                P_eval[resample_idx], observation_emb
+            # proposal = flow: samples = \Theta
+            proposal_sampler = partial(
+                flow_sampler,
+                base_dist_sampler=base_dist_sampler,
+                flow_transform=flow_transform,
             )
-            corrected_thetas = posterior_est.flow.net._transform.inverse(
-                corrected_zs, xs
-            )[0]
+            # f = ratio r(T_{\phi}^{-1}(\Theta))
+            f = partial(
+                clf_ratio_obs,
+                x_obs=observation,
+                clfs=trained_clfs,
+                inv_flow_transform=inv_flow_transform,
+            )
+            # sample from ratio * flow \approx p(\theta | x_obs)
+            acc_rej_samples_flow = []
+            for _ in range(args.n_rej_trials):
+                acc_rej_samples_flow.append(
+                    rejection_sampling(proposal_sampler=proposal_sampler, f=f)
+                )
 
-            samples_list = [
-                flow_thetas.detach().numpy(),
-                corrected_thetas.detach().numpy(),
-                posterior_samples,
-            ]
-            legends = [
-                r"NPE: $T_{\phi}(Z;x_0)$",
-                r"corrected NPE: $T_{\phi}(Z_r;x_0)$",
-                r"Reference: $\Theta \mid x_0$",
-            ]
-            colors = ["orange", "red", "blue"]
+            samples_list = [flow_thetas.detach().numpy()] + acc_rej_samples_flow
+
+            legends = [r"NPE: $T_{\phi}(Z;x_0)$"] + [
+                "corrected NPE acc_rej_flow"
+            ] * args.n_rej_trials
+
+            colors = ["orange"] + ["red"] * args.n_rej_trials
+
+            if dim < 3:
+                # --> still very long in high dimensions
+                # proposal = uniform, samples = T_phi(U)
+                # --> not U to get into the right range of flow-pdf-values
+                proposal_sampler = partial(
+                    uniform_sampler,
+                    dim=dim,
+                    flow_transform=flow_transform,
+                )
+                # f = r(u)*q_phi(T_phi(u))
+                # --> doing f = r(T_phi^{-1}(u)*q_phi(u) takes too much time, doesn't converge...
+                f = partial(
+                    corrected_pdf,
+                    dist=posterior_est.flow,
+                    x_obs=observation,
+                    clfs=trained_clfs,
+                    inv_flow_transform=inv_flow_transform,
+                )
+                # sample from ratio * flow \approx p(\theta | x_obs)
+                acc_rej_samples_uniform = []
+                for _ in range(args.n_rej_trials):
+                    acc_rej_samples_uniform.append(
+                        rejection_sampling(proposal_sampler=proposal_sampler, f=f)
+                    )
+
+                samples_list += acc_rej_samples_uniform
+
+                legends += ["corrected NPE acc_rej_uniform"] * args.n_rej_trials
+
+                colors += ["green"] * args.n_rej_trials
+
+            samples_list += [posterior_samples]
+            legends += [r"Reference: $\Theta \mid x_0$"]
+            colors += ["blue"]
+
             multi_corner_plots(
                 samples_list,
                 legends,
                 colors,
                 title="correction in z-space",
-                labels=[r"$\theta$" + f"_{i}" for i in range(dim)]
+                labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)]
                 # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
             )
             plt.savefig(PATH_EXPERIMENT / "posterior_correction_z_space_corner.pdf")
             plt.show()
 
-            # samples_list = [
-            #     posterior_samples,
-            #     algorithm_posterior_samples,
-            #     flow_thetas.detach().numpy(),
-            # ]
-            # legends = [
-            #     r"Ref: $p(\Theta \mid x_0)$",
-            #     r"NPE: $p(T_{\phi}(Z;x_0))$",
-            #     r"NPE on z-eval: $T_{\phi}(Z_eval;x_0)$",
-            # ]
-            # colors = ["blue", "orange", "red"]
-            # multi_corner_plots(
-            #     samples_list,
-            #     legends,
-            #     colors,
-            #     title=r"True vs. Estimated distributions at $x_0$",
-            #     labels=[r"$\theta$" + f"_{i}" for i in range(dim)],
-            #     # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
-            # )
-            # # plt.savefig(PATH_EXPERIMENT / "theta_space_reference_corner.pdf")
-            # plt.show()
-
         else:
-            samples_list = [
-                P_eval.numpy(),
-                P_eval[resample_idx].numpy(),
-                posterior_samples,
-            ]
-            legends = [
-                r"NPE: $\Theta \sim q_{\phi}(\theta \mid x_0)$",
-                "corrected NPE",
-                r"Reference: $\Theta \sim p(\theta \mid x_0)$",
-            ]
-            colors = ["orange", "red", "blue"]
+
+            # proposal = flow: samples = \Theta
+            proposal_sampler = partial(
+                flow_sampler,
+                base_dist_sampler=base_dist_sampler,
+                flow_transform=flow_transform,
+            )
+            # f = ratio r(\Theta)
+            f = partial(
+                clf_ratio_obs,
+                x_obs=observation,
+                clfs=trained_clfs,
+            )
+            # sample from ratio * flow_pdf \approx p(\theta | x_obs)
+            acc_rej_samples_flow = []
+            for _ in range(args.n_rej_trials):
+                acc_rej_samples_flow.append(
+                    rejection_sampling(proposal_sampler=proposal_sampler, f=f)
+                )
+
+            samples_list = [P_eval.numpy()] + acc_rej_samples_flow
+
+            legends = [r"NPE: $\Theta \sim q_{\phi}(\theta \mid x_0)$"] + [
+                "corrected NPE acc_rej_flow"
+            ] * args.n_rej_trials
+
+            colors = ["orange"] + ["red"] * args.n_rej_trials
+
+            if dim < 3:
+                # --> still very long in high dimensions
+                # proposal = uniform, samples = T_phi(U)
+                # --> not U to get into the right range of flow-pdf-values
+                # --> still very long in high dimensions
+                proposal_sampler = partial(
+                    uniform_sampler,
+                    dim=dim,
+                    flow_transform=flow_transform,
+                )
+                # f = r(T_phi(U))*q_phi(T_phi(u)) \approx p(\theta | x_obs)
+                # --> doing f = r(u)*q_phi(u) takes too much time, doesn't converge...
+                f = partial(
+                    corrected_pdf,
+                    dist=posterior_est.flow,
+                    x_obs=observation,
+                    clfs=trained_clfs,
+                )
+                # sample from ratio * flow \approx p(\theta | x_obs)
+                acc_rej_samples_uniform = []
+                for _ in range(args.n_rej_trials):
+                    acc_rej_samples_uniform.append(
+                        rejection_sampling(proposal_sampler=proposal_sampler, f=f)
+                    )
+
+                samples_list += acc_rej_samples_uniform
+
+                legends += ["corrected NPE acc_rej_uniform"] * args.n_rej_trials
+
+                colors += ["green"] * args.n_rej_trials
+
+            samples_list += [posterior_samples]
+            legends += [r"Reference: $\Theta \sim p(\theta \mid x_0)$"]
+            colors += ["blue"]
+
             multi_corner_plots(
                 samples_list,
                 legends,
-                colors,
+                colors=colors,
                 title="correction in parameter space",
-                labels=[r"$\theta$" + f"_{i}" for i in range(dim)]
+                labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)]
                 # domain=(torch.tensor([-5, -5]), torch.tensor([5, 5])),
             )
             plt.savefig(PATH_EXPERIMENT / "posterior_correction_theta_space_corner.pdf")

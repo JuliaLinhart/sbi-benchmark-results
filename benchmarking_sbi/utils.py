@@ -439,3 +439,17 @@ def clean(
         row["MMD"] = float("nan")
 
     return row
+
+
+def fwd_flow_transform_obs(batch_z, observation, flow):
+    observation_emb = flow.net._embedding_net(observation)
+    zs, xs = flow._match_theta_and_x_batch_shapes(batch_z, observation_emb)
+    transformed_zs = flow.net._transform.inverse(zs, xs)[0].detach()
+    return transformed_zs
+
+
+def inv_flow_transform_obs(batch_theta, observation, flow):
+    observation_emb = flow.net._embedding_net(observation)
+    thetas, xs = flow._match_theta_and_x_batch_shapes(batch_theta, observation_emb)
+    transformed_thetas = flow.net._transform(thetas, xs)[0].detach()
+    return transformed_thetas
