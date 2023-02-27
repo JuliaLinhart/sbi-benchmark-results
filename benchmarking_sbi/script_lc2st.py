@@ -138,61 +138,61 @@ if __name__ == "__main__":
     inv_flow_samples_ref = posterior_est.flow.net._transform(thetas, xs)[0].detach()
 
     dim = thetas.shape[-1]
-    # if dim <= 2:
-    #     flow_vs_reference_distribution(
-    #         samples_ref=base_dist_samples_cal,
-    #         samples_flow=inv_flow_samples_ref,
-    #         z_space=True,
-    #         dim=dim,
-    #         hist=False,
-    #     )
-    #     plt.savefig(PATH_EXPERIMENT / "z_space_reference.pdf")
-    #     plt.show()
+    if dim <= 2:
+        flow_vs_reference_distribution(
+            samples_ref=base_dist_samples_cal,
+            samples_flow=inv_flow_samples_ref,
+            z_space=True,
+            dim=dim,
+            hist=False,
+        )
+        plt.savefig(PATH_EXPERIMENT / "z_space_reference.pdf")
+        plt.show()
 
-    # samples_list = [base_dist_samples_cal, inv_flow_samples_ref]
-    # legends = [
-    #     r"Ref: $\mathcal{N}(0,1)$",
-    #     r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
-    # ]
-    # colors = ["blue", "orange"]
-    # multi_corner_plots(
-    #     samples_list,
-    #     legends,
-    #     colors,
-    #     title=r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)",
-    #     labels=[r"$z$" f"_{i+1}" for i in range(dim)],
-    #     domain=(torch.ones(dim) * -5, torch.ones(dim) * 5),
-    # )
-    # plt.savefig(PATH_EXPERIMENT / "z_space_reference_corner.pdf")
-    # plt.show()
+    samples_list = [base_dist_samples_cal, inv_flow_samples_ref]
+    legends = [
+        r"Ref: $\mathcal{N}(0,1)$",
+        r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
+    ]
+    colors = ["blue", "orange"]
+    multi_corner_plots(
+        samples_list,
+        legends,
+        colors,
+        title=r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)",
+        labels=[r"$z$" f"_{i+1}" for i in range(dim)],
+        domain=(torch.ones(dim) * -5, torch.ones(dim) * 5),
+    )
+    plt.savefig(PATH_EXPERIMENT / "z_space_reference_corner.pdf")
+    plt.show()
 
-    # # True vs. estimated posterior samples
-    # if dim <= 2:
-    #     flow_vs_reference_distribution(
-    #         samples_ref=posterior_samples,
-    #         samples_flow=algorithm_posterior_samples,
-    #         z_space=False,
-    #         dim=dim,
-    #         hist=False,
-    #     )
-    #     plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
-    #     plt.show()
+    # True vs. estimated posterior samples
+    if dim <= 2:
+        flow_vs_reference_distribution(
+            samples_ref=posterior_samples,
+            samples_flow=algorithm_posterior_samples,
+            z_space=False,
+            dim=dim,
+            hist=False,
+        )
+        plt.savefig(PATH_EXPERIMENT / "theta_space_reference.pdf")
+        plt.show()
 
-    # samples_list = [posterior_samples, algorithm_posterior_samples]
-    # legends = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
-    # colors = ["blue", "orange"]
-    # multi_corner_plots(
-    #     samples_list,
-    #     legends,
-    #     colors,
-    #     title=r"True vs. Estimated distributions at $x_0$",
-    #     labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)],
-    #     # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
-    # )
-    # plt.savefig(PATH_EXPERIMENT / "theta_space_reference_corner.pdf")
-    # plt.show()
+    samples_list = [posterior_samples, algorithm_posterior_samples]
+    legends = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
+    colors = ["blue", "orange"]
+    multi_corner_plots(
+        samples_list,
+        legends,
+        colors,
+        title=r"True vs. Estimated distributions at $x_0$",
+        labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)],
+        # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
+    )
+    plt.savefig(PATH_EXPERIMENT / "theta_space_reference_corner.pdf")
+    plt.show()
 
-    # plt.close("all")
+    plt.close("all")
 
     # =============== Hypothesis test and ensemble probas ================
     metrics = ["probas_mean", "w_dist", "TV"]
@@ -456,13 +456,31 @@ if __name__ == "__main__":
                     rejection_sampling(proposal_sampler=proposal_sampler, f=f)
                 )
 
-            samples_list = [flow_thetas.detach().numpy()] + acc_rej_samples_flow
+            # acc_rej_samples_approx_flow = []
+            # for _ in range(args.n_rej_trials):
+            #     acc_rej_samples_approx_flow.append(
+            #         rejection_sampling(
+            #             proposal_sampler=proposal_sampler, f=f, approximate=True
+            #         )
+            #     )
 
-            legends = [r"NPE: $T_{\phi}(Z;x_0)$"] + [
-                "corrected NPE acc_rej_flow"
-            ] * args.n_rej_trials
+            samples_list = (
+                [flow_thetas.detach().numpy()]
+                + acc_rej_samples_flow
+                # + acc_rej_samples_approx_flow
+            )
 
-            colors = ["orange"] + ["red"] * args.n_rej_trials
+            legends = (
+                [r"NPE: $T_{\phi}(Z;x_0)$"]
+                + ["corrected NPE acc_rej_flow"] * args.n_rej_trials
+                # + ["corrected NPE acc_rej_approx_flow"] * args.n_rej_trials
+            )
+
+            colors = (
+                ["orange"]
+                + ["red"] * args.n_rej_trials
+                # + ["purple"] * args.n_rej_trials
+            )
 
             if dim < 3:
                 # --> still very long in high dimensions
@@ -531,13 +549,31 @@ if __name__ == "__main__":
                     rejection_sampling(proposal_sampler=proposal_sampler, f=f)
                 )
 
-            samples_list = [P_eval.numpy()] + acc_rej_samples_flow
+            # acc_rej_samples_approx_flow = []
+            # for _ in range(args.n_rej_trials):
+            #     acc_rej_samples_approx_flow.append(
+            #         rejection_sampling(
+            #             proposal_sampler=proposal_sampler, f=f, approximate=True
+            #         )
+            #     )
 
-            legends = [r"NPE: $\Theta \sim q_{\phi}(\theta \mid x_0)$"] + [
-                "corrected NPE acc_rej_flow"
-            ] * args.n_rej_trials
+            samples_list = (
+                [P_eval.numpy()]
+                + acc_rej_samples_flow
+                # + acc_rej_samples_approx_flow
+            )
 
-            colors = ["orange"] + ["red"] * args.n_rej_trials
+            legends = (
+                [r"NPE: $\Theta \sim q_{\phi}(\theta \mid x_0)$"]
+                + ["corrected NPE acc_rej_flow"] * args.n_rej_trials
+                # + ["corrected NPE acc_rej_approx_flow"] * args.n_rej_trials
+            )
+
+            colors = (
+                ["orange"]
+                + ["red"] * args.n_rej_trials
+                # + ["purple"] * args.n_rej_trials
+            )
 
             if dim < 3:
                 # --> still very long in high dimensions
