@@ -491,15 +491,27 @@ if __name__ == "__main__":
                     dim=dim,
                     flow_transform=flow_transform,
                 )
-                # f = r(u)*q_phi(T_phi(u))
-                # --> doing f = r(T_phi^{-1}(u)*q_phi(u) takes too much time, doesn't converge...
+                # for T_phi(u) the proposal distribution is p(u)|detJT_phi^-1|, we only need q_phi/det = N(u)
                 f = partial(
                     corrected_pdf,
-                    dist=posterior_est.flow,
+                    # dist=posterior_est.flow,
+                    dist=posterior_est.flow.net._distribution,
                     x_obs=observation,
                     clfs=trained_clfs,
                     inv_flow_transform=inv_flow_transform,
                 )
+
+                # from valdiags.posterior_correction import corrected_pdf_old
+                # # f = r(u)*q_phi(T_phi(u))
+                # # --> doing f = r(T_phi^{-1}(u)*q_phi(u) takes too much time, doesn't converge...
+                # f = partial(
+                #     corrected_pdf_old,
+                #     dist=posterior_est.flow,
+                #     x_obs=observation,
+                #     clfs=trained_clfs,
+                #     inv_flow_transform=inv_flow_transform,
+                # )
+
                 # sample from ratio * flow \approx p(\theta | x_obs)
                 acc_rej_samples_uniform = []
                 for _ in range(args.n_rej_trials):
@@ -585,14 +597,27 @@ if __name__ == "__main__":
                     dim=dim,
                     flow_transform=flow_transform,
                 )
-                # f = r(T_phi(U))*q_phi(T_phi(u)) \approx p(\theta | x_obs)
-                # --> doing f = r(u)*q_phi(u) takes too much time, doesn't converge...
+                # for T_phi(u) the proposal distribution is p(u)|detJT_phi^-1|, we only need q_phi/det = N(u)
                 f = partial(
                     corrected_pdf,
-                    dist=posterior_est.flow,
+                    # dist=posterior_est.flow,
+                    dist=posterior_est.flow.net._distribution,
                     x_obs=observation,
                     clfs=trained_clfs,
+                    inv_flow_transform=inv_flow_transform,
+                    z_space=False,
                 )
+
+                # from valdiags.posterior_correction import corrected_pdf_old
+                # # f = r(u)*q_phi(T_phi(u))
+                # # --> doing f = r(T_phi^{-1}(u)*q_phi(u) takes too much time, doesn't converge...
+                # f = partial(
+                #     corrected_pdf_old,
+                #     dist=posterior_est.flow,
+                #     x_obs=observation,
+                #     clfs=trained_clfs,
+                # )
+
                 # sample from ratio * flow \approx p(\theta | x_obs)
                 acc_rej_samples_uniform = []
                 for _ in range(args.n_rej_trials):
