@@ -206,6 +206,7 @@ def compute_metrics_df(
     cal_set = {"theta": theta_cal, "x": x_cal}
 
     # inverse transform and base dist samples for lc2st
+    # on cal set
     inv_flow_samples = []
     for theta, x in zip(theta_cal, x_cal):
         theta, x = theta[None, :], x[None, :]
@@ -217,6 +218,15 @@ def compute_metrics_df(
     torch.save(cal_set, "calibration_dataset.pkl")
     torch.save(inv_flow_samples, "inv_flow_samples.pkl")
     torch.save(base_dist_samples, "base_dist_samples.pkl")
+
+    # on reference distribution
+    observation_emb = posterior_est.flow.net._embedding_net(observation)
+
+    thetas, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
+        reference_posterior_samples, observation_emb
+    )
+    inv_flow_samples_ref = posterior_est.flow.net._transform(thetas, xs)[0].detach()
+    torch.save(inv_flow_samples_ref, "inv_flow_samples_ref.pkl")
 
     # flow-posterior samples from x_cal
     import copy
@@ -233,6 +243,11 @@ def compute_metrics_df(
         )
     flow_posterior_samples_cal = torch.stack(flow_posterior_samples_cal)[:, 0, :]
     torch.save(flow_posterior_samples_cal, "flow_posterior_samples_cal.pkl")
+
+    # base mlp classifier
+    from sklearn.neural_network import MLPClassifier
+
+    mlp_base = MLPClassifier(alpha=0, max_iter=250000)
 
     # Get runtime info
     runtime_sec = torch.tensor(get_float_from_csv(path_runtime))  # noqa
@@ -251,20 +266,23 @@ def compute_metrics_df(
         #
         # 10k samples
         #
-        "C2ST": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
+        # "C2ST": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
         "C2ST_Z": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
         "MMD": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
         # "MMD_Z": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
         # "KSD_GAUSS": "metrics.ksd(task=task, num_observation=num_observation, samples=algorithm_posterior_samples, sig2=float(torch.median(torch.pdist(reference_posterior_samples))**2), log=False)",
         # "MEDDIST": "metrics.median_distance(predictive_samples, observation)",
         "LC2ST-accuracy-z": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='accuracy')",
+        "LC2ST-accuracy-z-ref": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='accuracy', Q_eval=inv_flow_samples_ref)",
         "LC2ST-probasMean-z": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='probas_mean')",
-        "exp-LC2ST-accuracy-z": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
-        "exp-LC2ST-probasMean-z": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
-        "LC2ST-accuracy-theta": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='accuracy', Z_eval=algorithm_posterior_samples)",
-        "LC2ST-probasMean-theta": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='probas_mean', Z_eval=algorithm_posterior_samples)",
-        "exp-LC2ST-accuracy-theta": "expected_lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal)",
-        "exp-LC2ST-probasMean-theta": "expected_lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal)",
+        "LC2ST-probasMean-z-baseMLP": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='probas_mean', classifier=mlp_base)",
+        # "exp-LC2ST-accuracy-z": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
+        # "exp-LC2ST-probasMean-z": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
+        "LC2ST-accuracy-theta": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='accuracy', P_eval=algorithm_posterior_samples)",
+        "LC2ST-accuracy-theta-ref": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='accuracy', P_eval=algorithm_posterior_samples, Q_eval=reference_posterior_samples)",
+        "LC2ST-probasMean-theta": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='probas_mean', P_eval=algorithm_posterior_samples)",
+        # "exp-LC2ST-accuracy-theta": "expected_lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal)",
+        # "exp-LC2ST-probasMean-theta": "expected_lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal)",
         #
         # # 1K samples
         # #

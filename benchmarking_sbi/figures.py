@@ -22,7 +22,7 @@ all_tasks = [
     # ["gaussian_linear", "gaussian_linear_uniform"],
     # ["slcp", "slcp_distractors"],
     # ["bernoulli_glm", "bernoulli_glm_raw"],
-    ["gaussian_linear"],
+    # ["gaussian_linear"],
     # ["gaussian_linear_uniform"],
     # ["slcp"],
     # ["slcp_distractors"],
