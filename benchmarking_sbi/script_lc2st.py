@@ -225,73 +225,73 @@ if __name__ == "__main__":
 
     # # =============== Reference plots ==================
 
-    # True conditional distributions: norm, inv-flow
-    from valdiags.localC2ST import flow_vs_reference_distribution
+    # # True conditional distributions: norm, inv-flow
+    # from valdiags.localC2ST_old import flow_vs_reference_distribution
 
-    # embedding not intergrated in transform method (includes standardize)
+    # # embedding not intergrated in transform method (includes standardize)
 
-    if dim <= 2:
-        flow_vs_reference_distribution(
-            samples_ref=base_dist_samples_cal,
-            samples_flow=inv_flow_samples_ref,
-            z_space=True,
-            dim=dim,
-            hist=False,
-        )
-        plt.savefig(PATH_EXPERIMENT_OBS / "z_space_reference.pdf")
-        plt.show()
+    # if dim <= 2:
+    #     flow_vs_reference_distribution(
+    #         samples_ref=base_dist_samples_cal,
+    #         samples_flow=inv_flow_samples_ref,
+    #         z_space=True,
+    #         dim=dim,
+    #         hist=False,
+    #     )
+    #     plt.savefig(PATH_EXPERIMENT_OBS / "z_space_reference.pdf")
+    #     plt.show()
 
-    samples_list = [base_dist_samples_cal, inv_flow_samples_ref]
-    legends = [
-        r"Ref: $\mathcal{N}(0,1)$",
-        r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
-    ]
-    colors = ["blue", "orange"]
-    multi_corner_plots(
-        samples_list,
-        legends,
-        colors,
-        title=r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)",
-        labels=[r"$z$" f"_{i+1}" for i in range(dim)],
-        domain=(torch.ones(dim) * -5, torch.ones(dim) * 5),
-    )
-    plt.savefig(PATH_EXPERIMENT_OBS / "z_space_reference_corner.pdf")
-    plt.show()
+    # samples_list = [base_dist_samples_cal, inv_flow_samples_ref]
+    # legends = [
+    #     r"Ref: $\mathcal{N}(0,1)$",
+    #     r"NPE: $T_{\phi}^{-1}(\Theta;x_0) \mid x_0$",
+    # ]
+    # colors = ["blue", "orange"]
+    # multi_corner_plots(
+    #     samples_list,
+    #     legends,
+    #     colors,
+    #     title=r"Base-Distribution vs. Inverse Flow-Transformation (of $\Theta \mid x_0$)",
+    #     labels=[r"$z$" f"_{i+1}" for i in range(dim)],
+    #     domain=(torch.ones(dim) * -5, torch.ones(dim) * 5),
+    # )
+    # plt.savefig(PATH_EXPERIMENT_OBS / "z_space_reference_corner.pdf")
+    # plt.show()
 
-    # True vs. estimated posterior samples
-    if dim <= 2:
-        flow_vs_reference_distribution(
-            samples_ref=posterior_samples,
-            samples_flow=algorithm_posterior_samples,
-            z_space=False,
-            dim=dim,
-            hist=False,
-        )
-        plt.savefig(PATH_EXPERIMENT_OBS / "theta_space_reference.pdf")
-        plt.show()
+    # # True vs. estimated posterior samples
+    # if dim <= 2:
+    #     flow_vs_reference_distribution(
+    #         samples_ref=posterior_samples,
+    #         samples_flow=algorithm_posterior_samples,
+    #         z_space=False,
+    #         dim=dim,
+    #         hist=False,
+    #     )
+    #     plt.savefig(PATH_EXPERIMENT_OBS / "theta_space_reference.pdf")
+    #     plt.show()
 
-    samples_list = [posterior_samples, algorithm_posterior_samples]
-    legends = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
-    colors = ["blue", "orange"]
-    multi_corner_plots(
-        samples_list,
-        legends,
-        colors,
-        title=r"True vs. Estimated distributions at $x_0$",
-        labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)],
-        # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
-    )
-    plt.savefig(PATH_EXPERIMENT_OBS / "theta_space_reference_corner.pdf")
-    plt.show()
+    # samples_list = [posterior_samples, algorithm_posterior_samples]
+    # legends = [r"Ref: $p(\Theta \mid x_0)$", r"NPE: $p(T_{\phi}(Z;x_0))$"]
+    # colors = ["blue", "orange"]
+    # multi_corner_plots(
+    #     samples_list,
+    #     legends,
+    #     colors,
+    #     title=r"True vs. Estimated distributions at $x_0$",
+    #     labels=[r"$\theta$" + f"_{i+1}" for i in range(dim)],
+    #     # domain=(torch.tensor([-15, -15]), torch.tensor([5, 5])),
+    # )
+    # plt.savefig(PATH_EXPERIMENT_OBS / "theta_space_reference_corner.pdf")
+    # plt.show()
 
-    plt.close("all")
+    # plt.close("all")
 
     # =============== Hypothesis test and ensemble probas ================
     metrics = ["probas_mean", "w_dist", "TV"]
 
     if args.run_htest:
         print("Running L-C2ST...")
-        from valdiags.localC2ST import lc2st_htest_sbibm
+        from valdiags.localC2ST_old import lc2st_htest_sbibm
 
         test_size = args.test_size
 
@@ -405,14 +405,11 @@ if __name__ == "__main__":
 
     # # =============== Result plots ===============
 
-    from valdiags.localC2ST import box_plot_lc2st
+    from valdiags.localC2ST_old import box_plot_lc2st
 
     for m in metrics:
         box_plot_lc2st(
-            [test_stats[m]],
-            t_stats_null[m],
-            labels=["NPE"],
-            colors=["red"],
+            [test_stats[m]], t_stats_null[m], labels=["NPE"], colors=["red"],
         )
         plt.savefig(
             PATH_EXPERIMENT_OBS
@@ -421,7 +418,7 @@ if __name__ == "__main__":
         plt.show()
         print(f"pvalues {m}:", p_values[m])
 
-    from valdiags.localC2ST import pp_plot_lc2st
+    from valdiags.localC2ST_old import pp_plot_lc2st
 
     pp_plot_lc2st([probas_ens], probas_null, labels=["NPE"], colors=["red"])
     plt.savefig(
@@ -432,9 +429,7 @@ if __name__ == "__main__":
     # =============== Interpretability plots ==================
     if dim <= 2:
         # High / Low probability regions
-        from valdiags.localC2ST import (
-            eval_space_with_proba_intensity,
-        )
+        from valdiags.localC2ST_old import eval_space_with_proba_intensity
 
         eval_space_with_proba_intensity(
             probas_ens, probas_null, P_eval, dim=dim, z_space=args.z_space
@@ -551,6 +546,11 @@ if __name__ == "__main__":
                 acc_rej_samples_flow.append(
                     rejection_sampling(proposal_sampler=proposal_sampler, f=f)
                 )
+            torch.save(
+                acc_rej_samples_flow,
+                PATH_EXPERIMENT_OBS
+                / f"acc_rej_samples_flow_z_{args.z_space}_{args.clf_name}.pkl",
+            )
 
             # acc_rej_samples_approx_flow = []
             # for _ in range(args.n_rej_trials):
@@ -583,9 +583,7 @@ if __name__ == "__main__":
                 # proposal = uniform, samples = T_phi(U)
                 # --> not U to get into the right range of flow-pdf-values
                 proposal_sampler = partial(
-                    uniform_sampler,
-                    dim=dim,
-                    flow_transform=flow_transform,
+                    uniform_sampler, dim=dim, flow_transform=flow_transform,
                 )
                 # for T_phi(u) the proposal distribution is p(u)|detJT_phi^-1|, we only need q_phi/det = N(u)
                 f = partial(
@@ -648,17 +646,19 @@ if __name__ == "__main__":
                 flow_transform=flow_transform,
             )
             # f = ratio r(\Theta)
-            f = partial(
-                clf_ratio_obs,
-                x_obs=observation,
-                clfs=trained_clfs,
-            )
+            f = partial(clf_ratio_obs, x_obs=observation, clfs=trained_clfs,)
             # sample from ratio * flow_pdf \approx p(\theta | x_obs)
             acc_rej_samples_flow = []
             for _ in range(args.n_rej_trials):
                 acc_rej_samples_flow.append(
                     rejection_sampling(proposal_sampler=proposal_sampler, f=f)
                 )
+
+            torch.save(
+                acc_rej_samples_flow,
+                PATH_EXPERIMENT_OBS
+                / f"acc_rej_samples_flow_z_{args.z_space}_{args.clf_name}.pkl",
+            )
 
             # acc_rej_samples_approx_flow = []
             # for _ in range(args.n_rej_trials):
@@ -692,9 +692,7 @@ if __name__ == "__main__":
                 # --> not U to get into the right range of flow-pdf-values
                 # --> still very long in high dimensions
                 proposal_sampler = partial(
-                    uniform_sampler,
-                    dim=dim,
-                    flow_transform=flow_transform,
+                    uniform_sampler, dim=dim, flow_transform=flow_transform,
                 )
                 # for T_phi(u) the proposal distribution is p(u)|detJT_phi^-1|, we only need q_phi/det = N(u)
                 f = partial(

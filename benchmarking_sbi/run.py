@@ -30,7 +30,7 @@ def main(cfg: DictConfig) -> None:
     log.info(f"Hostname: {socket.gethostname()}")
     if cfg.seed is None:
         log.info("Seed not specified, generating random seed for replicability")
-        cfg.seed = int(torch.randint(low=1, high=2**32 - 1, size=(1,))[0])
+        cfg.seed = int(torch.randint(low=1, high=2 ** 32 - 1, size=(1,))[0])
         log.info(f"Random seed: {cfg.seed}")
     save_config(cfg)
 
@@ -300,7 +300,7 @@ def compute_metrics_df(
     }
 
     import sbibm.metrics as metrics  # noqa
-    from valdiags.localC2ST import lc2st_sbibm, expected_lc2st_sbibm
+    from valdiags.localC2ST_old import lc2st_sbibm, expected_lc2st_sbibm
 
     metrics_dict = {}
     for metric, eval_cmd in _METRICS_.items():

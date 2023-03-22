@@ -6,7 +6,7 @@ from sklearn.discriminant_analysis import (
 )
 import torch.distributions as D
 
-from valdiags.localC2ST import eval_classifier_for_lc2st
+from valdiags.localC2ST_old import eval_classifier_for_lc2st
 import pandas as pd
 import sbibm
 import random
@@ -46,12 +46,20 @@ if __name__ == "__main__":
         help="do null precision experiment in theta_space.",
     )
 
+    parser.add_argument(
+        "--clf_names",
+        "-cn",
+        type=str,
+        help="names of classifiers to use in experiments.",
+        nargs="+",
+    )
+
     args = parser.parse_args()
 
     # Seeding
-    torch.manual_seed(1)
-    random.seed(1)
-    np.random.seed(1)
+    torch.manual_seed(13)
+    random.seed(13)
+    np.random.seed(13)
 
     task = sbibm.get_task(args.task)
     prior = task.get_prior()
@@ -88,7 +96,7 @@ if __name__ == "__main__":
     dim = theta.shape[-1]
 
     if args.null_hyp:
-        from valdiags.localC2ST import eval_null_lc2st
+        from valdiags.localC2ST_old import eval_null_lc2st
 
         N_LIST = [1000, 2000, 5000, 10000]
 
@@ -101,8 +109,10 @@ if __name__ == "__main__":
         null_dist = D.MultivariateNormal(
             loc=torch.zeros(dim), covariance_matrix=torch.eye(dim)
         )
-
-        clf_names = ["mlp_base", "mlp_sbi", "rf", "lda", "qda"]
+        if args.clf_names is None:
+            clf_names = ["mlp_base", "mlp_sbi", "rf", "lda", "qda"]
+        else:
+            clf_names = args.clf_names
         dfs = []
         for clf in clf_names:
             for n in N_LIST:
@@ -202,8 +212,9 @@ if __name__ == "__main__":
     else:
 
         # shifted gaussian samples for class 1
-        mean_shifts = [0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10]
-        scale_shifts = np.linspace(1, 20, 10)
+        mean_shifts = np.array([0, 0.3, 0.6, 1, 1.5, 2, 2.5, 3, 5, 10])
+        mean_shifts = np.concatenate([-1 * mean_shifts, mean_shifts[1:]])
+        scale_shifts = np.linspace(0.01, 10, 20)
         mean_shifted_samples = {}
         scale_shifted_samples = {}
 
@@ -227,51 +238,55 @@ if __name__ == "__main__":
         ).rsample((args.n_samples,))
 
         if args.shift == "mean":
-            if os.path.exists(PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl"):
-                df_mean = torch.load(PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl")
-            else:
+            if args.clf_names is None:
                 clf_names = ["lda", "mlp_sbi", "mlp_base", "rf"]
+            else:
+                clf_names = args.clf_names
 
-                dfs = []
-                for b in [True, False]:
-                    for clf_name in clf_names:
-                        (
-                            shift_list,
-                            scores,
-                            accuracies,
-                            times,
-                        ) = eval_classifier_for_lc2st(
-                            x,
-                            norm_samples,
-                            shifted_samples=mean_shifted_samples,
-                            shifts=mean_shifts,
-                            clf_class=clf_classes[clf_name],
-                            clf_kwargs=clf_kwargs_dict[clf_name],
-                            metrics=["probas_mean"],
-                            only_one_class_for_eval=b,
+            # if os.path.exists(PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl"):
+            #     df_mean = torch.load(PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl")
+            #     df_mean = df_mean.query(f"classifier in {args.clf_names}")
+            # else:
+            dfs = []
+            for b in [True, False]:
+                for clf_name in clf_names:
+                    (
+                        shift_list,
+                        scores,
+                        accuracies,
+                        times,
+                    ) = eval_classifier_for_lc2st(
+                        x,
+                        norm_samples,
+                        shifted_samples=mean_shifted_samples,
+                        shifts=mean_shifts,
+                        clf_class=clf_classes[clf_name],
+                        clf_kwargs=clf_kwargs_dict[clf_name],
+                        metrics=["probas_mean", "div"],
+                        only_one_class_for_eval=b,
+                    )
+                    if b:
+                        clf_method = [clf_name] * len(shift_list)
+                    else:
+                        clf_method = [clf_name + f"_ref"] * len(shift_list)
+
+                    dfs.append(
+                        pd.DataFrame(
+                            {
+                                "mean_shift": shift_list,
+                                "accuracy": accuracies,
+                                "probas_mean": scores["probas_mean"],
+                                "div": scores["div"],
+                                "total_cv_time": times,
+                                "classifier": clf_method,
+                            }
                         )
-                        if b:
-                            clf_method = [clf_name] * len(shift_list)
-                        else:
-                            clf_method = [clf_name + f"_ref"] * len(shift_list)
+                    )
+            df_mean = pd.concat(dfs, ignore_index=True)
 
-                        dfs.append(
-                            pd.DataFrame(
-                                {
-                                    "mean_shift": shift_list,
-                                    "accuracy": accuracies,
-                                    "probas_mean": scores["probas_mean"],
-                                    "total_cv_time": times,
-                                    "classifier": clf_method,
-                                }
-                            )
-                        )
-                df_mean = pd.concat(dfs, ignore_index=True)
-
-                torch.save(
-                    df_mean,
-                    PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl",
-                )
+            torch.save(
+                df_mean, PATH / f"df_mean_exp_lc2st_n_{args.n_samples}.pkl",
+            )
 
             sns.relplot(
                 data=df_mean,
@@ -295,53 +310,68 @@ if __name__ == "__main__":
             plt.savefig(PATH / f"lc2st_mean_shift_n_{args.n_samples}_accuracy.pdf")
             plt.show()
 
+            sns.relplot(
+                data=df_mean,
+                x="mean_shift",
+                y="div",
+                hue="classifier",
+                style="classifier",
+                kind="line",
+            )
+            plt.savefig(PATH / f"lc2st_mean_shift_n_{args.n_samples}_div.pdf")
+            plt.show()
+
         elif args.shift == "scale":
-            if os.path.exists(PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"):
-                df_scale = torch.load(
-                    PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"
-                )
-            else:
+            # if os.path.exists(PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"):
+            #     df_scale = torch.load(
+            #         PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl"
+            #     )
+            #     df_scale = df_scale.query(f"classifier in {args.clf_names}")
+            # else:
+            if args.clf_names is None:
                 clf_names = ["qda", "mlp_sbi", "mlp_base", "rf"]
+            else:
+                clf_names = args.clf_names
 
-                dfs = []
-                for b in [True, False]:
-                    for clf_name in clf_names:
-                        (
-                            shift_list,
-                            scores,
-                            accuracies,
-                            times,
-                        ) = eval_classifier_for_lc2st(
-                            x,
-                            norm_samples,
-                            shifted_samples=scale_shifted_samples,
-                            shifts=scale_shifts,
-                            clf_class=clf_classes[clf_name],
-                            clf_kwargs=clf_kwargs_dict[clf_name],
-                            metrics=["probas_mean"],
-                            only_one_class_for_eval=b,
+            dfs = []
+            for b in [True, False]:
+                for clf_name in clf_names:
+                    (
+                        shift_list,
+                        scores,
+                        accuracies,
+                        times,
+                    ) = eval_classifier_for_lc2st(
+                        x,
+                        norm_samples,
+                        shifted_samples=scale_shifted_samples,
+                        shifts=scale_shifts,
+                        clf_class=clf_classes[clf_name],
+                        clf_kwargs=clf_kwargs_dict[clf_name],
+                        metrics=["probas_mean", "div"],
+                        only_one_class_for_eval=b,
+                    )
+                    if b:
+                        clf_method = [clf_name] * len(shift_list)
+                    else:
+                        clf_method = [clf_name + "_ref"] * len(shift_list)
+                    dfs.append(
+                        pd.DataFrame(
+                            {
+                                "scale_shift": shift_list,
+                                "accuracy": accuracies,
+                                "probas_mean": scores["probas_mean"],
+                                "div": scores["div"],
+                                "total_cv_time": times,
+                                "classifier": clf_method,
+                            }
                         )
-                        if b:
-                            clf_method = [clf_name] * len(shift_list)
-                        else:
-                            clf_method = [clf_name + "_ref"] * len(shift_list)
-                        dfs.append(
-                            pd.DataFrame(
-                                {
-                                    "scale_shift": shift_list,
-                                    "accuracy": accuracies,
-                                    "probas_mean": scores["probas_mean"],
-                                    "total_cv_time": times,
-                                    "classifier": clf_method,
-                                }
-                            )
-                        )
-                df_scale = pd.concat(dfs, ignore_index=True)
+                    )
+            df_scale = pd.concat(dfs, ignore_index=True)
 
-                torch.save(
-                    df_scale,
-                    PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl",
-                )
+            torch.save(
+                df_scale, PATH / f"df_scale_exp_lc2st_n_{args.n_samples}.pkl",
+            )
 
             sns.relplot(
                 data=df_scale,
@@ -363,6 +393,17 @@ if __name__ == "__main__":
                 kind="line",
             )
             plt.savefig(PATH / f"lc2st_scale_shift_n_{args.n_samples}_accuracy.pdf")
+            plt.show()
+
+            sns.relplot(
+                data=df_scale,
+                x="scale_shift",
+                y="div",
+                hue="classifier",
+                style="classifier",
+                kind="line",
+            )
+            plt.savefig(PATH / f"lc2st_scale_shift_n_{args.n_samples}_div.pdf")
             plt.show()
 
         else:
