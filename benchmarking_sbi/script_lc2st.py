@@ -6,7 +6,7 @@ import numpy as np
 import random
 
 from sbibm.utils.io import get_tensor_from_csv, save_float_to_csv
-from valdiags.plot_utils import multi_corner_plots
+from valdiags.plot_pdfs import multi_corner_plots
 
 from utils import fwd_flow_transform_obs, inv_flow_transform_obs
 
