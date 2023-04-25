@@ -1,3 +1,14 @@
+# ansible
+# boto
+# hiplot
+# hydra-core>=1.1.1
+# hydra-joblib-launcher>=1.1.0
+# hydra-rq-launcher>=1.0.1
+# jupyter
+# sbibm
+# supervisor
+# selenium==4.2.0
+
 ansible
 boto
 hiplot
@@ -5,6 +16,7 @@ hydra-core>=1.1.1
 hydra-joblib-launcher>=1.1.0
 hydra-rq-launcher>=1.0.1
 jupyter
-sbibm
+sbibm==1.0.7
 supervisor
-selenium==4.2.0
+
+# we need a python environment < 3.11 to be compatible with hydra 

@@ -21,6 +21,9 @@ from sbibm.utils.io import (
 )
 from sbibm.utils.nflows import FlowWrapper
 
+from utils import fwd_flow_transform_obs, inv_flow_transform_obs
+import copy
+
 
 @hydra.main(config_path="config", config_name="config")
 def main(cfg: DictConfig) -> None:
@@ -30,7 +33,7 @@ def main(cfg: DictConfig) -> None:
     log.info(f"Hostname: {socket.gethostname()}")
     if cfg.seed is None:
         log.info("Seed not specified, generating random seed for replicability")
-        cfg.seed = int(torch.randint(low=1, high=2 ** 32 - 1, size=(1,))[0])
+        cfg.seed = int(torch.randint(low=1, high=2**32 - 1, size=(1,))[0])
         log.info(f"Random seed: {cfg.seed}")
     save_config(cfg)
 
@@ -204,45 +207,91 @@ def compute_metrics_df(
     theta_cal = prior(num_samples=cal_size)
     x_cal = simulator(theta_cal)
     cal_set = {"theta": theta_cal, "x": x_cal}
+    log.info(f"Generated {cal_size} samples from the joint for calibration dataset.")
 
     # inverse transform and base dist samples for lc2st
     # on cal set
-    inv_flow_samples = []
+    est = copy.deepcopy(posterior_est)
+    inv_flow_samples_cal = []
     for theta, x in zip(theta_cal, x_cal):
         theta, x = theta[None, :], x[None, :]
-        # embedding not intergrated in transform method (includes standardize)
-        x = posterior_est.flow.net._embedding_net(x)
-        inv_flow_samples.append(posterior_est.flow.net._transform(theta, x)[0].detach())
-    inv_flow_samples = torch.stack(inv_flow_samples)[:, 0, :]
-    base_dist_samples = posterior_est.flow.net._distribution.sample(cal_size)
+        est.flow.set_default_x(x)
+        theta_transformed = inv_flow_transform_obs(theta, x, est.flow)
+        inv_flow_samples_cal.append(theta_transformed)
+        # # embedding not intergrated in transform method (includes standardize)
+        # x = est.flow.posterior_estimator._embedding_net(x)
+        # inv_flow_samples_cal.append(
+        #     est.flow.posterior_estimator._transform(theta, x)[0].detach()
+        # )
+    inv_flow_samples_cal = torch.stack(inv_flow_samples_cal)[:, 0, :]
+    base_dist_samples = posterior_est.flow.posterior_estimator._distribution.sample(
+        cal_size
+    )
     torch.save(cal_set, "calibration_dataset.pkl")
-    torch.save(inv_flow_samples, "inv_flow_samples.pkl")
+    torch.save(inv_flow_samples_cal, "inv_flow_samples_cal.pkl")
     torch.save(base_dist_samples, "base_dist_samples.pkl")
 
     # on reference distribution
-    observation_emb = posterior_est.flow.net._embedding_net(observation)
-
-    thetas, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
-        reference_posterior_samples, observation_emb
+    posterior_est.flow.set_default_x(observation)
+    inv_flow_samples_ref = inv_flow_transform_obs(
+        reference_posterior_samples, observation, posterior_est.flow
     )
-    inv_flow_samples_ref = posterior_est.flow.net._transform(thetas, xs)[0].detach()
+
+    # observation_emb = posterior_est.flow.posterior_estimator._embedding_net(observation)
+
+    # thetas, xs = posterior_est.flow._match_theta_and_x_batch_shapes(
+    #     reference_posterior_samples, observation_emb
+    # )
+    # inv_flow_samples_ref = posterior_est.flow.posterior_estimator._transform(
+    #     thetas, xs
+    # )[0].detach()
     torch.save(inv_flow_samples_ref, "inv_flow_samples_ref.pkl")
 
     # flow-posterior samples from x_cal
-    import copy
-
     est = copy.deepcopy(posterior_est)
     flow_posterior_samples_cal = []
     for x in x_cal:
-        # flow_posterior_samples_cal.append(est.sample(x=x).detach())
-        # # this is not the same as transforming...
-        sample_z = est.flow.net._distribution.sample(1)
-        x_emb = est.flow.net._embedding_net(x[None, :])
-        flow_posterior_samples_cal.append(
-            est.flow.net._transform.inverse(sample_z, x_emb)[0].detach()
-        )
+        x = x[None, :]
+        est.flow.set_default_x(x)
+        z = est.flow.posterior_estimator._distribution.sample(1)
+        z_transformed = fwd_flow_transform_obs(z, x, est.flow)
+        flow_posterior_samples_cal.append(z_transformed)
+        # x_emb = est.flow.net._embedding_net(x[None, :])
+        # flow_posterior_samples_cal.append(
+        #     est.flow.net._transform.inverse(sample_z, x_emb)[0].detach()
+        # )
     flow_posterior_samples_cal = torch.stack(flow_posterior_samples_cal)[:, 0, :]
     torch.save(flow_posterior_samples_cal, "flow_posterior_samples_cal.pkl")
+    log.info(
+        f"Computed the inverse flow transform on the calibration dataset and reference posterior samples (for LC2ST_NF)."
+    )
+
+    # Eval samples from the normal for LCST_NF
+    base_dist_samples_eval = (
+        posterior_est.flow.posterior_estimator._distribution.sample(
+            task.num_posterior_samples
+        )
+    )
+
+    # Load samples
+    reference_posterior_samples_eval = task.get_reference_posterior_samples(
+        num_observation
+    )[: task.num_posterior_samples, :]
+    algorithm_posterior_samples_eval = get_tensor_from_csv(path_samples)[
+        : task.num_posterior_samples, :
+    ]
+    log.info(
+        f"Loaded {task.num_posterior_samples} samples from reference and algorithm for (non cross-val) evaluation."
+    )
+
+    # on reference distribution
+    posterior_est.flow.set_default_x(observation)
+    inv_flow_samples_ref_eval = inv_flow_transform_obs(
+        reference_posterior_samples_eval, observation, posterior_est.flow
+    )
+    log.info(
+        f"Computed the inverse flow transform on the reference posterior samples for evaluation (non cross-val)."
+    )
 
     # base mlp classifier
     from sklearn.neural_network import MLPClassifier
@@ -267,22 +316,31 @@ def compute_metrics_df(
         # 10k samples
         #
         # "C2ST": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
-        "C2ST_Z": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
+        # "C2ST_NF": "metrics.c2st(X=inv_flow_samples_ref, Y=base_dist_samples, z_score=False)",
+        # sbibm reference metric
+        "C2ST_Z_CV": "metrics.c2st(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
+        "C2ST_NF_Z_CV": "metrics.c2st(X=inv_flow_samples_ref, Y=base_dist_samples, z_score=True)",
+        # vanilla c2st but with ensemble (+ fixed eval_set) instead of cv
+        "C2ST": "c2st_sbibm(P=reference_posterior_samples, Q=algorithm_posterior_samples, metric='accuracy', n_ensemble=10, cross_val=False, P_eval=reference_posterior_samples_eval, Q_eval=algorithm_posterior_samples_eval)",
+        "C2ST_NF": "c2st_sbibm(P=inv_flow_samples_ref, Q=base_dist_samples, metric='accuracy', n_ensemble=10, cross_val=False, P_eval=inv_flow_samples_ref_eval, Q_eval=base_dist_samples_eval)",
+        # reg-c2st with ensemble (+fixed eval_set) and out-of-sample instead of insample
+        "C2ST_REG": "c2st_sbibm(P=reference_posterior_samples, Q=algorithm_posterior_samples, metric='mse', n_ensemble=10, cross_val=False, P_eval=reference_posterior_samples_eval, Q_eval=algorithm_posterior_samples_eval)",
+        "C2ST_REG_NF": "c2st_sbibm(P=inv_flow_samples_ref, Q=base_dist_samples, metric='mse', n_ensemble=10, cross_val=False, P_eval=inv_flow_samples_ref_eval, Q_eval=base_dist_samples_eval)",
+        #
         "MMD": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=False)",
         # "MMD_Z": "metrics.mmd(X=reference_posterior_samples, Y=algorithm_posterior_samples, z_score=True)",
         # "KSD_GAUSS": "metrics.ksd(task=task, num_observation=num_observation, samples=algorithm_posterior_samples, sig2=float(torch.median(torch.pdist(reference_posterior_samples))**2), log=False)",
         # "MEDDIST": "metrics.median_distance(predictive_samples, observation)",
-        "LC2ST-accuracy-z": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='accuracy')",
-        "LC2ST-accuracy-z-ref": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='accuracy', Q_eval=inv_flow_samples_ref)",
-        "LC2ST-probasMean-z": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='probas_mean')",
-        "LC2ST-probasMean-z-baseMLP": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal, x_eval=observation, metric='probas_mean', classifier=mlp_base)",
+        "LC2ST_CV": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='accuracy', P_eval=algorithm_posterior_samples, n_folds=10, cross_val=True)",
+        "LC2ST_NF_CV": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='accuracy', P_eval=base_dist_samples_eval, n_folds=10, cross_val=True)",
+        "LC2ST_REG_CV": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='mse', P_eval=algorithm_posterior_samples, n_folds=10, cross_val=True)",
+        "LC2ST_NF_REG_CV": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='mse', P_eval=base_dist_samples_eval, n_folds=10, cross_val=True)",
+        "LC2ST": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='accuracy', P_eval=algorithm_posterior_samples, n_ensemble=10, cross_val=False)",
+        "LC2ST_NF": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='accuracy', P_eval=base_dist_samples_eval, n_ensemble=10, cross_val=False)",
+        "LC2ST_REG": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='mse', P_eval=algorithm_posterior_samples, n_ensemble=10, cross_val=False)",
+        "LC2ST_REG_NF": "lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples_cal, x_P=x_cal, x_Q=x_cal, x_eval=observation, metric='mse', P_eval=base_dist_samples_eval, n_ensemble=10, cross_val=False)",
         # "exp-LC2ST-accuracy-z": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
-        # "exp-LC2ST-probasMean-z": "expected_lc2st_sbibm(P=base_dist_samples, Q=inv_flow_samples, x_cal=x_cal)",
-        "LC2ST-accuracy-theta": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='accuracy', P_eval=algorithm_posterior_samples)",
-        "LC2ST-accuracy-theta-ref": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='accuracy', P_eval=algorithm_posterior_samples, Q_eval=reference_posterior_samples)",
-        "LC2ST-probasMean-theta": "lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal, x_eval=observation, metric='probas_mean', P_eval=algorithm_posterior_samples)",
         # "exp-LC2ST-accuracy-theta": "expected_lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal)",
-        # "exp-LC2ST-probasMean-theta": "expected_lc2st_sbibm(P=flow_posterior_samples_cal, Q=theta_cal, x_cal=x_cal)",
         #
         # # 1K samples
         # #
@@ -300,17 +358,22 @@ def compute_metrics_df(
     }
 
     import sbibm.metrics as metrics  # noqa
-    from valdiags.localC2ST_old import lc2st_sbibm, expected_lc2st_sbibm
+    from valdiags.localC2ST_old import lc2st_sbibm as lc2st_sbibm_old
+    from valdiags.vanillaC2ST import c2st_sbibm
+    from valdiags.localC2ST import lc2st_sbibm
 
     metrics_dict = {}
     for metric, eval_cmd in _METRICS_.items():
         log.info(f"Computing {metric}")
+        t0 = time.time()
         try:
             metrics_dict[metric] = eval(eval_cmd).cpu().numpy().astype(np.float32)
             log.info(f"{metric}: {metrics_dict[metric]}")
         except:
             metrics_dict[metric] = float("nan")
-
+        runtime = time.time() - t0
+        log.info(f"Runtime {metric}: {runtime}")
+        metrics_dict["runtime_" + metric] = runtime
     return pd.DataFrame(metrics_dict)
 
 

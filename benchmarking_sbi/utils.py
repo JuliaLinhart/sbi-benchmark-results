@@ -441,15 +441,28 @@ def clean(
     return row
 
 
+## ==== added : start ====
+from sbi.utils import match_theta_and_x_batch_shapes
+
+
 def fwd_flow_transform_obs(batch_z, observation, flow):
-    observation_emb = flow.net._embedding_net(observation)
-    zs, xs = flow._match_theta_and_x_batch_shapes(batch_z, observation_emb)
-    transformed_zs = flow.net._transform.inverse(zs, xs)[0].detach()
-    return transformed_zs
+    observation_emb = flow.posterior_estimator._embedding_net(observation)
+    z_repeated, x_repeated = match_theta_and_x_batch_shapes(batch_z, observation_emb)
+    z_transformed = flow.posterior_estimator._transform.inverse(z_repeated, x_repeated)[
+        0
+    ].detach()
+    return z_transformed
 
 
 def inv_flow_transform_obs(batch_theta, observation, flow):
-    observation_emb = flow.net._embedding_net(observation)
-    thetas, xs = flow._match_theta_and_x_batch_shapes(batch_theta, observation_emb)
-    transformed_thetas = flow.net._transform(thetas, xs)[0].detach()
-    return transformed_thetas
+    observation_emb = flow.posterior_estimator._embedding_net(observation)
+    theta_repeated, x_repeated = match_theta_and_x_batch_shapes(
+        batch_theta, observation_emb
+    )
+    theta_transformed = flow.posterior_estimator._transform(theta_repeated, x_repeated)[
+        0
+    ].detach()
+    return theta_transformed
+
+
+## ==== added : end ====
