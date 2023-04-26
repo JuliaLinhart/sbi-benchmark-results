@@ -1,3 +1,4 @@
 name: gaussian_linear_uniform
 num_simulations: 1000
 num_observation: 1
+num_posterior_samples: 20000
